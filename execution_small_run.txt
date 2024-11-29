@@ -1,0 +1,161 @@
+--------KNN CLASSIFICATION EXPERIMENT--------
+Dataset: b-59-850
+Samples per class: 30
+Min occurence: 50
+Model type: MatchingNetwork
+Pretrained: False
+Checkpoint path: datasets/b-59-850/experiments/VICReg/MatchingNetwork/bboxes_encdim1600_expdim1024_bs16_ep4_sw10_vw10_cw1_encoder.pt
+Number of bootstrap runs: 5
+----------------------------------------------------
+Removing labels that appear less than 50 times
+Before: 17112 samples, After: 16709 samples
+Dataset b-59-850 information:
+	Total number of samples: 16709
+	Number of classes: 28
+----------------------------------------------------
+Bootstrap run 1/5
+USING DEVICE: cuda
+Train Accuracy: 2.58 Test Accuracy: 0.88
+Bootstrap run 2/5
+USING DEVICE: cuda
+Train Accuracy: 2.55 Test Accuracy: 0.90
+Bootstrap run 3/5
+USING DEVICE: cuda
+Train Accuracy: 2.58 Test Accuracy: 0.91
+Bootstrap run 4/5
+USING DEVICE: cuda
+Train Accuracy: 2.57 Test Accuracy: 0.87
+Bootstrap run 5/5
+USING DEVICE: cuda
+Train Accuracy: 2.54 Test Accuracy: 0.88
+----------------------------------------------------
+BOOTSTRAP SUMMARY:
+	Samples per class: 30
+	Number of bootstrap runs: 5
+	Mean accuracy: 0.89
+	Standard deviation: 0.01
+--------KNN CLASSIFICATION EXPERIMENT--------
+Dataset: b-59-850
+Samples per class: 30
+Min occurence: 50
+Model type: MatchingNetwork
+Pretrained: False
+Checkpoint path: datasets/b-59-850/experiments/VICReg/MatchingNetwork/allpatches_k64x64_s32x32_et0.8_encdim1600_expdim1024_bs16_ep4_sw10_vw10_cw1_encoder.pt
+Number of bootstrap runs: 5
+----------------------------------------------------
+Removing labels that appear less than 50 times
+Before: 17112 samples, After: 16709 samples
+Dataset b-59-850 information:
+	Total number of samples: 16709
+	Number of classes: 28
+----------------------------------------------------
+Bootstrap run 1/5
+USING DEVICE: cuda
+Train Accuracy: 2.56 Test Accuracy: 0.89
+Bootstrap run 2/5
+USING DEVICE: cuda
+Train Accuracy: 2.58 Test Accuracy: 0.91
+Bootstrap run 3/5
+USING DEVICE: cuda
+Train Accuracy: 2.54 Test Accuracy: 0.88
+Bootstrap run 4/5
+USING DEVICE: cuda
+Train Accuracy: 2.56 Test Accuracy: 0.88
+Bootstrap run 5/5
+USING DEVICE: cuda
+Train Accuracy: 2.55 Test Accuracy: 0.89
+----------------------------------------------------
+BOOTSTRAP SUMMARY:
+	Samples per class: 30
+	Number of bootstrap runs: 5
+	Mean accuracy: 0.89
+	Standard deviation: 0.01
+--------KNN CLASSIFICATION EXPERIMENT--------
+Dataset: Egyptian
+Samples per class: 30
+Min occurence: 50
+Model type: MatchingNetwork
+Pretrained: False
+Checkpoint path: datasets/Egyptian/experiments/VICReg/MatchingNetwork/bboxes_encdim1600_expdim1024_bs16_ep4_sw10_vw1_cw1_encoder.pt
+Number of bootstrap runs: 5
+----------------------------------------------------
+Removing labels that appear less than 50 times
+Before: 4210 samples, After: 2959 samples
+Dataset Egyptian information:
+	Total number of samples: 2959
+	Number of classes: 18
+----------------------------------------------------
+Bootstrap run 1/5
+USING DEVICE: cuda
+Train Accuracy: 2.08 Test Accuracy: 0.90
+Bootstrap run 2/5
+USING DEVICE: cuda
+Train Accuracy: 2.06 Test Accuracy: 0.92
+Bootstrap run 3/5
+USING DEVICE: cuda
+Train Accuracy: 2.07 Test Accuracy: 0.89
+Bootstrap run 4/5
+USING DEVICE: cuda
+Train Accuracy: 2.07 Test Accuracy: 0.90
+Bootstrap run 5/5
+USING DEVICE: cuda
+Train Accuracy: 2.07 Test Accuracy: 0.89
+----------------------------------------------------
+BOOTSTRAP SUMMARY:
+	Samples per class: 30
+	Number of bootstrap runs: 5
+	Mean accuracy: 0.90
+	Standard deviation: 0.01
+--------KNN CLASSIFICATION EXPERIMENT--------
+Dataset: Egyptian
+Samples per class: 30
+Min occurence: 50
+Model type: MatchingNetwork
+Pretrained: False
+Checkpoint path: datasets/Egyptian/experiments/VICReg/MatchingNetwork/allpatches_k32x32_s16x16_et0.8_encdim1600_expdim1024_bs16_ep4_sw10_vw1_cw1_encoder.pt
+Number of bootstrap runs: 5
+----------------------------------------------------
+Removing labels that appear less than 50 times
+Before: 4210 samples, After: 2959 samples
+Dataset Egyptian information:
+	Total number of samples: 2959
+	Number of classes: 18
+----------------------------------------------------
+Bootstrap run 1/5
+USING DEVICE: cuda
+Train Accuracy: 2.05 Test Accuracy: 0.89
+Bootstrap run 2/5
+USING DEVICE: cuda
+Train Accuracy: 2.09 Test Accuracy: 0.87
+Bootstrap run 3/5
+USING DEVICE: cuda
+Train Accuracy: 2.06 Test Accuracy: 0.91
+Bootstrap run 4/5
+USING DEVICE: cuda
+Train Accuracy: 2.06 Test Accuracy: 0.90
+Bootstrap run 5/5
+USING DEVICE: cuda
+Train Accuracy: 2.06 Test Accuracy: 0.90
+----------------------------------------------------
+BOOTSTRAP SUMMARY:
+	Samples per class: 30
+	Number of bootstrap runs: 5
+	Mean accuracy: 0.90
+	Standard deviation: 0.01
+--------KNN CLASSIFICATION EXPERIMENT--------
+Dataset: TKH
+Samples per class: 30
+Min occurence: 50
+Model type: MatchingNetwork
+Pretrained: False
+Checkpoint path: datasets/TKH/experiments/VICReg/MatchingNetwork/bboxes_encdim1600_expdim1024_bs16_ep4_sw10_vw1_cw1_encoder.pt
+Number of bootstrap runs: 5
+----------------------------------------------------
+Removing labels that appear less than 50 times
+Before: 323498 samples, After: 315516 samples
+Dataset TKH information:
+	Total number of samples: 315516
+	Number of classes: 347
+----------------------------------------------------
+Bootstrap run 1/5
+USING DEVICE: cuda
