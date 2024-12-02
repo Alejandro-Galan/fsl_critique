@@ -9,8 +9,8 @@ from models.PrototypicalNetwork import PrototypicalNetwork
 
 class FewShotTrain():
 
-    def train_few_shot_net(batch_size, encoder, X, Y, device, classes_per_set, samples_per_class, X_eval, Y_eval, checkpoint_path, 
-                           model_type="Original", optimizer = None, episodes=1000, metrics=None):
+    def train_few_shot_net(batch_size, encoder, X, Y, device, classes_per_set, samples_per_class, X_eval, Y_eval, 
+                           checkpoint_path, model_type="", optimizer = None, episodes=1000, metrics=None):
 
         encoder.train()
         total_c_loss = 0.0
@@ -57,7 +57,8 @@ class FewShotTrain():
                     all_outputs, inputs_y = PrototypicalNetwork.get_outputs(x_target, y_target, x_support_set, y_support_set, encoder)
                     acc, c_loss = prototypical_loss(all_outputs, target=inputs_y, n_support=samples_per_class, samples_per_class=samples_per_class, batch_size=batch_size)
 
-                wandb.log({"tr_acc": acc, "tr_loss": c_loss})
+                if not Constants.DEACTIVATE_WANDB:
+                    wandb.log({"tr_acc": acc, "tr_loss": c_loss})
 
                 # optimize process
                 optimizer.zero_grad()
@@ -86,7 +87,8 @@ class FewShotTrain():
                                             device=device, model_type=model_type, supp_set=None, classes_per_set=classes_per_set, samples_per_class=samples_per_class, metrics=metrics)
 
                     # print("TEST ACCS", test_accs)
-                    wandb.log({"tr_eval_acc": test_accs, "tr_eval_loss": test_loss})
+                    if not Constants.DEACTIVATE_WANDB:
+                        wandb.log({"tr_eval_acc": test_accs, "tr_eval_loss": test_loss})
 
                     if test_accs > metrics['best_accuracy']:
                         # print(
@@ -116,7 +118,8 @@ class FewShotTrain():
 
 
         # Save only in last iteration
-        new_path = checkpoint_path.replace("encoder.pt", "_trained_model.pt")
+        # new_path = checkpoint_path.replace("encoder.pt", "_trained_model.pt")
+        new_path = checkpoint_path + "_trained_model.pt"
         os.makedirs(os.path.dirname(new_path), exist_ok=True )
 
         torch.save({
@@ -252,7 +255,15 @@ class FewShotTrain():
                 # if end_i > X.shape[0]: 
                 #     end_i = X.shape[0]
                 # index_batch = indexes[i*batch_size:end_i]
-                index_batch = np.random.choice(X.shape[0], batch_size, replace=False)
+
+                # It must correspond to one of those
+                if Constants.USE_ORIGINAL_FIXED_SUPP_SET:
+                    # Select X where Y['supp'] == Y
+                    
+                    index_batch = np.random.choice(X.shape[0], batch_size, replace=False)
+
+                else:
+                    index_batch = np.random.choice(X.shape[0], batch_size, replace=False)
                 x_support_set, y_support_set, x_target, y_target = FewShotTrain.get_subsamples_sets(X, Y, index_batch, model_type=model_type, metrics=metrics, 
                                                                                                     classes_per_set=classes_per_set, samples_per_class=samples_per_class,
                                                                                                     only_nk=True)
@@ -277,7 +288,8 @@ class FewShotTrain():
                     all_outputs, inputs_y = PrototypicalNetwork.get_outputs(x_target, y_target, x_support_set, y_support_set, encoder)
                     acc, c_loss = prototypical_loss(all_outputs, target=inputs_y, n_support=samples_per_class, samples_per_class=samples_per_class, batch_size=batch_size)
 
-                wandb.log({"ft_acc": acc, "ft_loss": c_loss})
+                if not Constants.DEACTIVATE_WANDB:
+                    wandb.log({"ft_acc": acc, "ft_loss": c_loss})
 
                 # optimize process
                 optimizer.zero_grad()
@@ -306,7 +318,8 @@ class FewShotTrain():
                                             device=device, model_type=model_type, supp_set=None, classes_per_set=classes_per_set, samples_per_class=samples_per_class, metrics=metrics, finetune=True)
 
                     # print("TEST ACCS", test_accs)
-                    wandb.log({"ft_eval_acc": test_accs, "ft_eval_loss": test_loss})
+                    if not Constants.DEACTIVATE_WANDB:
+                        wandb.log({"ft_eval_acc": test_accs, "ft_eval_loss": test_loss})
 
                     if test_accs > metrics['best_accuracy']:
                         # print(
@@ -320,7 +333,7 @@ class FewShotTrain():
                         torch.save({
                             'model_state_dict': encoder.state_dict(),
                             'optimizer_state_dict': optimizer.state_dict(),
-                        }, checkpoint_path.replace("encoder.pt", "_trained_finetuned_model.pt") )
+                        }, checkpoint_path + "_trained_finetuned_model.pt" )
 
                         epochs_no_improve = 0
 
@@ -431,7 +444,7 @@ class FewShotTrain():
     #     return imgs[0], labels[0], x_target[0], y_target[0]
         
     # Convert every episode classes to a transcription of size "num_classes_per_set"
-    def codify_subset_classes( supp, exc, max_c):
+    def codify_subset_classes( supp, exc, max_c, model_type):
 
         new_vec = np.append(supp, exc)
         classes = {}
@@ -442,8 +455,10 @@ class FewShotTrain():
                 classes[class_] = len(classes)
             new_vec[e] = classes[class_]
 
-        assert len(classes) <= max_c
-
+        try:
+            assert len(classes) == max_c 
+        except:
+            breakpoint()
         supp_v, query_v = new_vec[:len(supp)], new_vec[len(supp):]
         
         return supp_v, query_v
@@ -485,9 +500,13 @@ class FewShotTrain():
 
                 if model_type == "PrototypicalNetwork":
                     exc = get_multiple_querys(exc, Y, metrics['YSupp'], only_nk)
+                else:
+                    exc = get_one_query(exc, Y, metrics['YSupp'], only_nk)
 
                 # change Y labels to equal size of num_classes 
-                supp_y, exc_y = FewShotTrain.codify_subset_classes(metrics['YSupp'], Y[exc], classes_per_set)
+                if Y[exc].item() not in metrics['YSupp']:
+                    breakpoint()
+                supp_y, exc_y = FewShotTrain.codify_subset_classes(metrics['YSupp'], Y[exc], classes_per_set, model_type)
                 ############ DEBUG ##################
                 # index_debug_fixed = np.arange(0,samples_per_class)
                 # supp_y, exc_y = FewShotTrain.codify_subset_classes(Y[index_debug_fixed], Y[exc], classes_per_set)
@@ -521,9 +540,13 @@ class FewShotTrain():
                 supp_index = FewShotTrain.get_support_set_index(Y, exc, max_c, samples_per_class, only_nk=only_nk)
                 if model_type == "PrototypicalNetwork":
                     exc = get_multiple_querys(exc, Y, supp_index)
+                elif model_type == "MatchingNetwork":
+                    exc = get_one_query(exc, Y, supp_index, only_nk)
+                    
+
 
                 # change Y labels to equal size of num_classes 
-                supp_y, exc_y = FewShotTrain.codify_subset_classes(Y[supp_index], Y[exc], max_c)
+                supp_y, exc_y = FewShotTrain.codify_subset_classes(Y[supp_index], Y[exc], max_c, model_type)
 
                 supp_x, supp_y = X[supp_index], supp_y
                 if Constants.SHUFFLE_SUPP_SET:
@@ -586,6 +609,32 @@ def get_multiple_querys(exc, Y, supp_index, only_nk=False):
                     index = sub_index
             
             new_exc.append(np.random.choice(index, Constants.n_query, replace=False)[0])
+    return new_exc
+
+
+# Just one query from same class than Ysupp for MatchingNetwork
+def get_one_query(exc, Y, supp_index, only_nk=False):
+    # Only classes present in supp
+    if not only_nk:
+        supp_classes = np.unique(Y[supp_index])
+    else:
+        supp_classes = np.unique(supp_index)
+
+    # Choose a random int from the class
+    random_int = np.random.randint(0, len(supp_classes))
+
+    index = (Y == supp_classes[random_int]).nonzero(as_tuple=True)[0]
+
+    # Check if exc is from the supp set, if not choose other one
+    if exc in index:
+        new_exc = exc
+    else:
+        if not only_nk:
+            sub_index = [i for i in index if i not in supp_index]
+            if len(sub_index) > 1:
+                index = sub_index
+        
+        new_exc = np.random.choice(index, Constants.n_query, replace=False)[0]
     return new_exc
 
 def extend_dimenstions_bs(arr, batch_size):
