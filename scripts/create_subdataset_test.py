@@ -9,17 +9,17 @@ from PIL import Image
 
 class Ds:
 
-    def __init__(self, type_ds):
+    def __init__(self, type_ds, partition):
         self.type_ds = type_ds
 
         if type_ds == "omniglot":
             self.src_dataset = "datasets/omniglot/data"
-            self.tgt_dataset = "datasets/omniglot_SOTA_testSet/data"
-            self.test_data   = "datasets/partitions_fixed/omniglot_test.txt"
-        elif type_ds == "miniImageNet":
-            self.src_dataset = "datasets/miniImageNet"
-            self.tgt_dataset = "datasets/miniImageNet_SOTA_testSet"
-            self.test_data   = "datasets/partitions_fixed/miniImageNet_test.csv"
+            self.tgt_dataset = "datasets/omniglot_SOTA_" + partition + "Set/data"
+            self.test_data   = "datasets/partitions_fixed/omniglot_" + partition + ".txt"
+        # elif type_ds == "miniImageNet":
+        #     self.src_dataset = "datasets/miniImageNet"
+        #     self.tgt_dataset = "datasets/miniImageNet_SOTA_testSet"
+        #     self.test_data   = "datasets/partitions_fixed/miniImageNet_test.csv"
 
 
     def read_save_image(self, src, tgt, rotation_deg):
@@ -83,8 +83,12 @@ class Ds:
 
 
 if __name__ == "__main__":
-    D_o = Ds("omniglot")
-    D_o.main()
+    D_test = Ds("omniglot", "test")
+    D_test.main()
+
+    D_trainval = Ds("omniglot", "trainval")
+    D_trainval.main()
+
     # D_m = Ds("miniImageNet")
     # D_m.main()
 

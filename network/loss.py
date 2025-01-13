@@ -1,11 +1,15 @@
 from typing import Tuple
 
-import torch
+import torch, sys
 import torch.nn.functional as F
 import numpy as np
 
 from torch.nn.modules import Module
-from my_utils.constants import Constants
+from my_utils.constants import Const_c
+# Initialize reading the json constants file for each experiment
+exp = int(sys.argv[1])
+Constants_c = Const_c(exp)
+Constants = Constants_c.Constants
 from torch.autograd import Variable
 
 def invariance_loss(za: torch.Tensor, zb: torch.Tensor) -> torch.Tensor:
@@ -239,11 +243,11 @@ def prototypical_loss(input, target, n_support, samples_per_class, batch_size):
         all_dists.append(proto_loss_batch(input_cpu[b], target_cpu[b], n_support))
     dists = torch.stack(all_dists)
     n_classes = dists.shape[1]
-    log_p_y = F.log_softmax(-dists, dim=2).view(batch_size, n_classes, Constants.n_query, -1)
+    log_p_y = F.log_softmax(-dists, dim=2).view(batch_size, n_classes, Constants["n_query"], -1)
 
     target_inds = torch.arange(0, n_classes)
     target_inds = target_inds.view(1, n_classes, 1, 1)
-    target_inds = target_inds.expand(batch_size, n_classes, Constants.n_query, 1).long()
+    target_inds = target_inds.expand(batch_size, n_classes, Constants["n_query"], 1).long()
 
     loss_val = -log_p_y.gather(3, target_inds).squeeze().view(-1).mean()
     _, y_hat = log_p_y.max(3)
@@ -291,7 +295,7 @@ def prototypical_loss(input, target, n_support, samples_per_class, batch_size):
 #         for b in range(batch_size):
 #             subl = target_cpu[b].eq(c).nonzero()[samples_per_class:].squeeze(1).tolist()
 #             # FineTuning scenario
-#             if len(subl) < Constants.n_query:
+#             if len(subl) < Constants["n_query:
 #                 subl = target_cpu[b].eq(c).nonzero()[:n_query].squeeze(1).tolist()
 #             # Add the batch idx
 #             aux_ids.append([[b] + pos[:-1] for pos in subl])
@@ -305,7 +309,7 @@ def prototypical_loss(input, target, n_support, samples_per_class, batch_size):
 #     # FIXME when torch will support where as np
 #     # assuming n_query, n_target constants
 #     #### CHANGE: only one query in one particular class
-#     n_query = Constants.n_query
+#     n_query = Constants["n_query
 #     # n_query = target_cpu.shape[1] - n_support
 #     ####
 

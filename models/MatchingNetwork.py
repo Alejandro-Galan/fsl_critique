@@ -8,7 +8,7 @@
 ## LICENSE file in the root directory of this source tree
 ##+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-import torch, tqdm, wandb
+import torch, tqdm, wandb, sys
 import torch.nn as nn
 import unittest
 import numpy as np
@@ -20,7 +20,12 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from sklearn.metrics import classification_report
 
-from my_utils.constants import Constants
+from my_utils.constants import Const_c
+# Initialize reading the json constants file for each experiment
+exp = int(sys.argv[1])
+Constants_c = Const_c(exp)
+Constants = Constants_c.Constants
+
 
 
 
@@ -29,9 +34,9 @@ from my_utils.constants import Constants
 
 
 class MatchingNetwork(nn.Module):
-    def __init__(self, keep_prob, XSupp, YSupp, encoder_features, \
-                 batch_size=100, num_channels=1, learning_rate=0.001, fce=False, num_classes_per_set=5, \
-                 num_samples_per_class=1, nClasses = 0, image_size = 28, best_accuracy = 0.0):
+    def __init__(self, keep_prob, encoder_features, \
+                 batch_size=100, num_channels=1, learning_rate=0.001, fce=False, num_samples_per_class=5, \
+                 num_classes_per_set_train=1, num_classes_per_set_test=1, nClasses = 0, image_size = 28, best_accuracy = 0.0):
         super(MatchingNetwork, self).__init__()
 
         """
@@ -60,15 +65,16 @@ class MatchingNetwork(nn.Module):
         self.dn = DistanceNetwork()
         self.classify = AttentionalClassify()
         self.keep_prob = keep_prob
-        self.num_classes_per_set = num_classes_per_set
         self.num_samples_per_class = num_samples_per_class
+        self.num_classes_per_set_train = num_classes_per_set_train
+        self.num_classes_per_set_test = num_classes_per_set_test
         self.learning_rate = learning_rate
         self.PATIENCE = 10
         self.best_accuracy = best_accuracy
         self.best_class_rep = None
 
-        self.XSupp=XSupp
-        self.YSupp=YSupp
+        # self.XSupp=XSupp
+        # self.YSupp=YSupp
 
     def forward(self, support_set_images, support_set_labels_one_hot, target_image, target_label):
         """
@@ -117,7 +123,7 @@ class MatchingNetwork(nn.Module):
 
         # Only 1 sample at evaluation (batch 1)
         if len(preds.shape) == 1:
-            preds = preds.unsqueeze(0)
+            preds = preds.unsqueeze(1)
 
         # calculate accuracy and crossentropy loss
         values, indices = preds.max(1)

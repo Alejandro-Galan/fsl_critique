@@ -1,18 +1,22 @@
-import os
-from my_utils.constants import Constants
+import os, sys
+from my_utils.constants import Const_c
+# Initialize reading the json constants file for each experiment
+exp = int(sys.argv[1])
+Constants_c = Const_c(exp)
+Constants = Constants_c.Constants
 
 ################################################### PRETRAIN HPARAMS:
 # Common hyperparameters to all datasets
 ENTROPY_THRESHOLD = 0.8
 ENCODER_FEATURES_DIM = 1600
 EXPANDER_FEATURES_DIM = 1024
-EPOCHS = Constants.EPOCHS
-EPISODES = Constants.EPISODES
-BATCH_SIZE = Constants.BATCH_SIZE
+EPOCHS = Constants["EPOCHS"]
+EPISODES = Constants["EPISODES"]
+BATCH_SIZE = Constants["BATCH_SIZE"]
 NUM_RANDOM_PATCHES = -1
 
 # Hyperparameters for each dataset
-DS_PRETRAIN_HPARAMS = Constants.TGT_DATASETS
+DS_PRETRAIN_HPARAMS = Constants["TGT_DATASETS"]
 
 # DS_PRETRAIN_HPARAMS = {
 #     "b-59-850": {
@@ -110,7 +114,7 @@ def get_model_path(
 for ds_name, pretrain_config in DS_PRETRAIN_HPARAMS.items():
     DS_TEST_HPARAMS[ds_name] = {}
     # for model_type in ["MatchingNetwork", "CustomCNN", "Resnet34"]:
-    for model_type in Constants.MODEL_TYPE:
+    for model_type in Constants["MODEL_TYPE"]:
         DS_TEST_HPARAMS[ds_name][f"{model_type.lower()}_bboxes"] = get_model_path(
             ds_name=ds_name,
             supervised_data=True,

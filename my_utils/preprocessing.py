@@ -2,16 +2,20 @@ from collections import Counter
 from operator import itemgetter
 from typing import Tuple
 
-import cv2
+import cv2, sys
 import numpy as np
 
-from my_utils.constants import Constants
+from my_utils.constants import Const_c
+# Initialize reading the json constants file for each experiment
+exp = int(sys.argv[1])
+Constants_c = Const_c(exp)
+Constants = Constants_c.Constants
 
 
 def preprocess_image(image: np.ndarray, resize: bool = True) -> np.ndarray:
     if resize:
         image = cv2.resize(
-            image, Constants.INPUT_SIZE, interpolation=cv2.INTER_AREA
+            image, Constants["INPUT_SIZE"], interpolation=cv2.INTER_AREA
         )  # Resize
     image = image / 255  # Normalize
     image = np.transpose(image, (2, 0, 1))  # HWC -> CHW

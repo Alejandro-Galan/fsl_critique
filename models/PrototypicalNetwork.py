@@ -33,14 +33,14 @@ class PrototypicalNetwork(nn.Module):
         return x.view(x.size(0), -1)
     
     def get_outputs(x_target, y_target, x_support_set, y_support_set, encoder):
+
         if len(x_target.shape) < 5:
             x_target = x_target.unsqueeze(1)
             y_target = y_target.unsqueeze(2)
         inputs_x = torch.cat((x_support_set, x_target), dim=1).cuda()
 
         if len(y_target.shape) == 1:
-            y_target = y_target.unsqueeze(0)
-
+            y_target = y_target.unsqueeze(1)
         inputs_y = torch.cat((y_support_set, y_target.unsqueeze(2)), dim=1).cuda()
 
         # For each item
