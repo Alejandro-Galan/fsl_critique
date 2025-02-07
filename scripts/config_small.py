@@ -1,8 +1,11 @@
 import os, sys
+import importlib
+from my_utils import constants
 from my_utils.constants import Const_c
 # Initialize reading the json constants file for each experiment
-exp = int(sys.argv[1])
-Constants_c = Const_c(exp)
+exp = str(sys.argv[2])
+full_name = str(sys.argv[3])
+Constants_c = Const_c(exp, full_name)
 Constants = Constants_c.Constants
 
 ################################################### PRETRAIN HPARAMS:
@@ -40,7 +43,7 @@ DS_PRETRAIN_HPARAMS = Constants["TGT_DATASETS"]
 #         "var_loss_weight": 1,
 #         "cov_loss_weight": 1,
 #     },
-#     "Greek": {
+#     " ": {
 #         "kernel": (32, 32),
 #         "stride": (16, 16),
 #         "sim_loss_weight": 10,

@@ -13,7 +13,7 @@ class Ds:
     def __init__(self):
 
         self.src_dataset = "datasets/BreaKHis_v1/histology_slides/breast"
-        self.tgt_dataset = "datasets/BreaKHis_formated/data"
+        self.tgt_dataset = "datasets/BreaKHis_formatted/data"
         os.makedirs(os.path.dirname(self.tgt_dataset), exist_ok=True)
 
 
@@ -81,8 +81,9 @@ class Ds:
             st_folder = self.src_dataset + "/" + b_folder + "/SOB/"
             
             for class_ in os.listdir(st_folder):
-                cl_folder = st_folder + "/" + class_
-                self.add_class(tgt_folder=self.tgt_dataset, src_folder=st_folder, class_name=b_folder + "__" + class_)
+                cl_folder = st_folder + class_
+                print(cl_folder, b_folder + "__" + class_)
+                self.add_class(tgt_folder=self.tgt_dataset, src_folder=cl_folder, class_name=b_folder + "__" + class_)
 
 
 if __name__ == "__main__":

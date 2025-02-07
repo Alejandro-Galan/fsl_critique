@@ -24,29 +24,26 @@
 
 ## About
 
-We propose a three-stage process for unlabelled self-supervised learning (SSL) symbol classification:
-
-<p align="center">
-  <img src="extras/workflow_final.png" alt="content" style="border: 1px solid black; width: 800px;">
-</p>
-
-1) **Extraction of isolated symbols from unlabelled documents.** Symbols are automatically extracted from unlabelled documents using a sliding-window approach. The documents are divided into patches, which are then converted to grayscale and binarized. The entropy value of each patch is calculated, and patches with an entropy value greater than a user-defined threshold are considered potential symbols.
-    
-2) **Training of a neural feature extractor using SSL.** A CNN is trained using the [Variance-Invariance-Covariance Regularization](https://arxiv.org/abs/2105.04906) SSL method. 
-    
-3) **Symbol classification using a k-nearest neighbours (kNN) classifier.** Firstly, a query and a labelled set of symbol images are mapped to the representation space defined by the CNN obtained in Stage 2. Secondly, the kNN rule is applied to classify the query based on the labels of its k closest neighbours.
 
 ## How To Use
 
-The datasets used in this work, namely *Capitan*, *TKH*, *Egyptian*, and *GRPOLY-DB*, are available upon [request](mailto:malfaro@dlsi.ua.es). After obtaining these datasets, please place them in the [`datasets`](datasets) folder. 
+To execute an experiment, please execute this line
 
-To run the code, you'll need to meet certain requirements which are specified in the [`Dockerfile`](Dockerfile). Alternatively, you can set up a virtual environment if preferred.
-
-Once you have prepared your environment (either a Docker container or a virtual environment), you are ready to begin. Execute the [`experiments/run.py`](experiments/run.py) script to replicate the experiments from our work:
-
-```python
-python experiments/run.py
+```python3 ./scripts/auto_paralel_exps.sh <experiment_number> <simultaneous_executions>
 ```
+
+There are also a few relevant scripts. 
+
+#### Extract the logs into simpler tables:
+
+```python3 logs_csv/filter_logs_csv.py
+```
+
+#### Compare datasets by predictions and generated embeddings:
+
+```python3 scripts/complementary_comparison_methods.py
+```
+
 
 ## Citations
 

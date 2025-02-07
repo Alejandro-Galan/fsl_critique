@@ -1,11 +1,14 @@
-import tqdm, torch, wandb, os, random, sys
+import tqdm, torch, wandb, os, random, sys, importlib
 import numpy as np
 from torch.autograd import Variable
 
+from my_utils import constants
+importlib.reload(constants)
 from my_utils.constants import Const_c
 # Initialize reading the json constants file for each experiment
-exp = int(sys.argv[1])
-Constants_c = Const_c(exp)
+exp = str(sys.argv[2])
+full_name = str(sys.argv[3])
+Constants_c = Const_c(exp, full_name)
 Constants = Constants_c.Constants
 
 from network.loss import prototypical_loss
@@ -370,10 +373,13 @@ class FewShotTrain():
                         best_epoch = i
                         # metrics['best_class_rep'] = classification_report(y_true=Y_eval.cpu().tolist(), y_pred=test_outputs.cpu(), output_dict=True)
 
+                        # If not exists (For example if using no pretrained weights)
+                        os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+
                         torch.save({
                             'model_state_dict': encoder.state_dict(),
                             'optimizer_state_dict': optimizer.state_dict(),
-                        }, checkpoint_path + "_trained_finetuned_model.pt" )
+                        }, checkpoint_path + "--GROUP_EXP_" + Constants["GROUP_EXPERIMENT"] + "--NWAY-test_" + str(Constants["LIMIT_N_WAY_TEST"]) + "--tgt_dataset_" + sorted(Constants["TGT_DATASETS"].keys() )[0] + "--_trained_finetuned_model.pt" )
 
                         epochs_no_improve = 0
 

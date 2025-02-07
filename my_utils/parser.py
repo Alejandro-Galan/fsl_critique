@@ -8,7 +8,7 @@ import torch
 
 import datasets.config as config
 from my_utils.preprocessing import preprocess_image
-
+from my_utils.constants import Const_c
 
 def parse_files(ds_name: str) -> Tuple[list, list]:
     # Set global variables
@@ -50,11 +50,11 @@ def parse_files_SOTA(ds_name: str) -> Tuple[list, list]:
     all_filepaths, all_labels = [], []
     for doc in os.listdir(config.images_dir):
         doc_path = os.path.join(config.images_dir, doc)
-        if ds_name.startswith("miniImageNet"):
+        if ds_name.startswith("miniImageNet") or ds_name.startswith(Const_c.DATASETS.BREAKHIS.value):
             images, labels = extract_image_label(label_name=doc, char=doc, doc_path=config.images_dir)
             all_labels += labels
             all_filepaths += images
-        elif ds_name.startswith("omniglot"):
+        elif ds_name.startswith("omniglot") :
             for char in os.listdir(doc_path):
                 label_name = doc + "_" + char
                 images, labels = extract_image_label(label_name, char, doc_path)

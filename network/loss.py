@@ -5,10 +5,13 @@ import torch.nn.functional as F
 import numpy as np
 
 from torch.nn.modules import Module
+import importlib
+from my_utils import constants
 from my_utils.constants import Const_c
 # Initialize reading the json constants file for each experiment
-exp = int(sys.argv[1])
-Constants_c = Const_c(exp)
+exp = str(sys.argv[2])
+full_name = str(sys.argv[3])
+Constants_c = Const_c(exp, full_name)
 Constants = Constants_c.Constants
 from torch.autograd import Variable
 

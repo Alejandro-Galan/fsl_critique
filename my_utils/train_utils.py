@@ -4,10 +4,13 @@ import numpy as np
 from sklearn.manifold import TSNE
 import sys
 
+import importlib
+from my_utils import constants
 from my_utils.constants import Const_c
 # Initialize reading the json constants file for each experiment
-exp = int(sys.argv[1])
-Constants_c = Const_c(exp)
+exp = str(sys.argv[2])
+full_name = str(sys.argv[3])
+Constants_c = Const_c(exp, full_name)
 Constants = Constants_c.Constants
 
 
@@ -184,7 +187,10 @@ def train_test_split(
             # YTest.extend(reduced_Y[test_samples])
             #####################################################################################
 
-            if unique_idx > ( Constants["TEST_SET_PERC"] * len(unique_ys) ):
+            # In case it is smaller than the minimum needed
+            limit_test_classes = max(Constants["TEST_SET_PERC"] * len(unique_ys), Constants["LIMIT_N_WAY_TEST"]) # Starts from 0
+            
+            if unique_idx >= limit_test_classes:
                 XTrain.extend(reduced_X[indices])
                 YTrain.extend(reduced_Y[indices])
             else:

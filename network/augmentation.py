@@ -3,10 +3,13 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from torchvision.transforms import InterpolationMode
 
+import importlib
+from my_utils import constants
 from my_utils.constants import Const_c
 # Initialize reading the json constants file for each experiment
-exp = int(sys.argv[1])
-Constants_c = Const_c(exp)
+exp = str(sys.argv[2])
+full_name = str(sys.argv[3])
+Constants_c = Const_c(exp, full_name)
 Constants = Constants_c.Constants
 
 
@@ -16,7 +19,7 @@ class AugmentStage(nn.Module):
         self.transforms = transforms.Compose(
             [
                 transforms.RandomResizedCrop(
-                    Constants["INPUT_SIZE"],
+                    Constants["INPUT_SIZE"][list(Constants['TGT_DATASETS'].keys())[0]],
                     scale=(0.5, 1.0),
                     interpolation=InterpolationMode.BICUBIC,
                 ),

@@ -1,4 +1,4 @@
-import gc
+import gc, importlib
 import random
 
 import fire, wandb, sys
@@ -12,6 +12,8 @@ from models.MatchingNetwork import MatchingNetwork
 from models.PrototypicalNetwork import PrototypicalNetwork
 
 import datasets.config as config
+import pandas as pd
+
 from datasets.loader import load_supervised_data
 from my_utils.generators import supervised_data_generator
 from my_utils.train_utils import train_test_split, write_plot_results
@@ -22,10 +24,15 @@ from network.model import (
     VggClassifier,
 )
 
+from my_utils import constants
+importlib.reload(constants)
 from my_utils.constants import Const_c
 # Initialize reading the json constants file for each experiment
-exp = int(sys.argv[1])
-Constants_c = Const_c(exp)
+exp_name = str(sys.argv[1])
+exp = str(sys.argv[2])
+full_name = str(sys.argv[3])
+Constants_c = Const_c(exp, full_name)
+
 Constants = Constants_c.Constants
 
 if Constants["DEACTIVATE_WANDB"]:
@@ -35,10 +42,7 @@ if Constants["DEACTIVATE_WANDB"]:
 import os
 os.environ['SENTENCE_TRANSFORMERS_HOME'] = './.cache'
 
-# Seed
-torch.manual_seed(1)
-random.seed(1)
-np.random.seed(1)
+
 
 
 def run_bootstrap(
@@ -66,72 +70,97 @@ def run_bootstrap(
     print(f"Number of epochs: {epochs}")
     print(f"Batch size: {batch_size}")
     print(f"Number of bootstrap runs: {num_runs}")
+    print(f"NWAY TRAIN: {Constants['LIMIT_N_WAY_TRAIN']}")
+    print(f"NWAY TEST: {Constants['LIMIT_N_WAY_TEST']}")
     print("----------------------------------------------------")
 
     # 1) LOAD DATA
     ## Use source datastes
-    src_datasets = "_".join([i for i in Constants["DATASETS_NAMES"] if i != ds_name])
-    src_input_size = str(Constants["INPUT_SIZE"][0]) + "x" + str(Constants["INPUT_SIZE"][1]) 
-    path_weights_base = "WEIGHTS/" + model_type + "--" + str(Constants["EPISODES"]) + "_Episodes--" \
-                                + src_input_size + "_INPUT_SIZE/" \
-                                + str(Constants["USE_ORIGINAL_FIXED_SUPP_SET"]) + "_FIXED_SUPP_SET--" \
-                                + src_datasets + "--" \
-                                + str(Constants["LIMIT_N_WAY_TRAIN"]) + "_NWAY_TRAIN--" \
-                                + str(Constants["BATCH_SIZE"]) + "_Batch_Size--" \
-                                + str(samples_per_class) + "_KSamples_per_Class--" \
-                                + str(Constants["lr"]) + "_lr--" \
-                                + str(Constants["VALIDATION_PERC"]) + "_ValSrc--" \
-                                # + str(Constants["BOOTSTRAP_ITERS"]) + "_Boots_Iters"
-    path_weights_base_pretrained = path_weights_base + "_trained_model.pt"
 
-    wandb.config.update({"src_datasets": src_datasets, "tgt_dataset": ds_name, "samples_per_class": samples_per_class, 
-                         "num_total_episodes": Constants["EPISODES"], "batch_size": Constants["BATCH_SIZE"],
-                         "num_bootstrap_iters": Constants["BOOTSTRAP_ITERS"], "input_size": src_input_size,
-                         "fixed_support": Constants["USE_ORIGINAL_FIXED_SUPP_SET"], "model_type": model_type,
-                         "n_way_train": Constants["LIMIT_N_WAY_TRAIN"], "lr": Constants["lr"],
-                         "n_way_test": Constants["LIMIT_N_WAY_TEST"], })
-    
-    if Constants["ALL_DATASETS"] or Constants["NoSrcDataset"]:
-        pretrained_sources = os.path.exists(path_weights_base_pretrained) if Constants["ReusePretrained"] else False
-        pretrained_sources = True if Constants["NoSrcDataset"] else pretrained_sources
 
-        # If no validation src paramenter, Xval is empty
-        data_dict = load_supervised_data(ds_name=ds_name, min_occurence=min_occurence, 
-                                         all_datasets=Constants["ALL_DATASETS"], pretrained_sources=pretrained_sources)
-        _, _, XTest, YTest, XSupp, YSupp, _, _ = train_test_split(
-            X=data_dict["X_test"],
-            Y=data_dict["Y_test"],
-            samples_per_class=samples_per_class,
-            model_type=model_type,
-        )
-
-        X_val, Y_val = data_dict["X_val"], data_dict["Y_val"]
-        
-        XTrain, YTrain, w2i = data_dict["X_train"], data_dict["Y_train"], data_dict["w2i"]
-        if len(np.unique(YTest)) == 0:
-            breakpoint()
-        
-    ## The whole target dataset to train/test
-    else:
-        data_dict = load_supervised_data(ds_name=ds_name, min_occurence=min_occurence)
-        X, Y, w2i = data_dict["X"], data_dict["Y"], data_dict["w2i"]
-        print(f"\tTotal number of samples: {len(Y)}")
-        print(f"\tNumber of classes: {len(w2i)}")
-    print(f"Dataset {ds_name} information:")
-    print("----------------------------------------------------")
-
-    # 2) SET OUTPUT DIR
-    output_dir = config.output_dir / "supervised"
-    output_dir = output_dir / f"{model_type}" #-Pretrained{pretrained}"
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     # 3) RUN BOOTSTRAP
     results = []
     train_best_acc = 0.0
     for run in range(num_runs):
+
+        string_id_base, string_id_ft, src_datasets, src_input_size = Const_c.get_experiment_id(PARAMS=Constants, boots_iter=run, return_extra_params=True)
+
+        if Const_c.all_boots_iter_done(exp, exp_name, ds_name, Constants, boots_iter=run):
+            continue
+        
+
+        path_weights_base = "WEIGHTS/" + string_id_base
+        path_weights_base_pretrained = path_weights_base + "_trained_model.pt"
+
+        wandb.config.update({"src_datasets": src_datasets, "tgt_dataset": ds_name, "samples_per_class": samples_per_class, 
+                            "num_total_episodes": Constants["EPISODES"], "batch_size": Constants["BATCH_SIZE"],
+                            "num_bootstrap_iters": Constants["BOOTSTRAP_ITERS"], "input_size": src_input_size,
+                            "fixed_support": Constants["USE_ORIGINAL_FIXED_SUPP_SET"], "model_type": model_type,
+                            "n_way_train": Constants["LIMIT_N_WAY_TRAIN"], "lr": Constants["lr"],
+                            "n_way_test": Constants["LIMIT_N_WAY_TEST"]})
+        
+        # Reproducibility
+        torch.manual_seed(run)
+        random.seed(run)
+        np.random.seed(run)
+        
+        if Constants["ALL_DATASETS"] or Constants["NoSrcDataset"]:
+            pretrained_sources = os.path.exists(path_weights_base_pretrained) if Constants["ReusePretrained"] else False
+            pretrained_sources = True if Constants["NoSrcDataset"] else pretrained_sources
+
+            # If no validation src paramenter, Xval is empty
+            data_dict = load_supervised_data(ds_name=ds_name, min_occurence=min_occurence, 
+                                            all_datasets=Constants["ALL_DATASETS"], pretrained_sources=pretrained_sources)
+            _, _, XTest, YTest, XSupp, YSupp, _, _ = train_test_split(
+                X=data_dict["X_test"],
+                Y=data_dict["Y_test"],
+                samples_per_class=samples_per_class,
+                model_type=model_type,
+            )
+
+            X_val, Y_val = data_dict["X_val"], data_dict["Y_val"]
+            
+            XTrain, YTrain, w2i = data_dict["X_train"], data_dict["Y_train"], data_dict["w2i"]
+            if exp == "exp6":
+                namess = ["BreaKHis_formatted"]
+                for dsn in namess:
+                    ds_name = dsn
+                    data_dict = load_supervised_data(ds_name=ds_name, min_occurence=min_occurence, 
+                                            all_datasets=Constants["ALL_DATASETS"], pretrained_sources=pretrained_sources)
+                    _, _, XTest, YTest, XSupp, YSupp, _, _ = train_test_split(
+                        X=data_dict["X_test"],
+                        Y=data_dict["Y_test"],
+                        samples_per_class=samples_per_class,
+                        model_type=model_type,
+                    )
+                    instances = np.unique(YTest, return_counts=True)[1]
+                    print(ds_name, len(np.unique(YTest, return_counts=False)), "(min,max,mean) => (", 
+                        min(instances), max(instances), round(np.mean(instances)), ")",
+                        instances,
+                        "Total", len(YTest))
+                    breakpoint()
+                exit()
+            if len(np.unique(YTest)) == 0:
+                breakpoint()
+            
+        ## The whole target dataset to train/test
+        else:
+            data_dict = load_supervised_data(ds_name=ds_name, min_occurence=min_occurence)
+            X, Y, w2i = data_dict["X"], data_dict["Y"], data_dict["w2i"]
+            print(f"\tTotal number of samples: {len(Y)}")
+            print(f"\tNumber of classes: {len(w2i)}")
+        print(f"Dataset {ds_name} information:")
+        print("----------------------------------------------------")
+
+        # 2) SET OUTPUT DIR
+        output_dir = config.output_dir / "supervised"
+        output_dir = output_dir / f"{model_type}" #-Pretrained{pretrained}"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
         print(f"Bootstrap run {run + 1}/{num_runs}")
         if not Constants["DEACTIVATE_WANDB"]:
-            wandb.log({"bootstrap_iter": run})
+            wandb.log({"bootstrap_iter": run})            
 
         if not Constants["ALL_DATASETS"]:
             # 3.1) Get samples
@@ -183,21 +212,22 @@ def run_bootstrap(
 
         results.append(accuracy)
 
-    # 4) SAVE RESULTS
-    print("----------------------------------------------------")
-    print("BOOTSTRAP SUMMARY:")
-    print(f"\tSamples per class: {samples_per_class}")
-    print(f"\tNumber of bootstrap runs: {num_runs}")
-    print(f"\tMean accuracy: {np.mean(results):.2f}")
-    print(f"\tStandard deviation: {np.std(results):.2f}")
-    write_plot_results(
-        filepath=output_dir / "results.txt",
-        from_weights="-",
-        epochs=epochs,
-        batch_size=batch_size,
-        results=results,
-        samples_per_class=samples_per_class,
-    )
+    if results:
+        # 4) SAVE RESULTS
+        print("----------------------------------------------------")
+        print("BOOTSTRAP SUMMARY:")
+        print(f"\tSamples per class: {samples_per_class}")
+        print(f"\tNumber of bootstrap runs: {num_runs}")
+        print(f"\tMean accuracy: {np.mean(results):.2f}")
+        print(f"\tStandard deviation: {np.std(results):.2f}")
+        write_plot_results(
+            filepath=output_dir / "results.txt",
+            from_weights="-",
+            epochs=epochs,
+            batch_size=batch_size,
+            results=results,
+            samples_per_class=samples_per_class,
+        )
 
 
 ############################################# UTILS:
@@ -260,7 +290,7 @@ def train_and_test_model(
                                 num_classes_per_set_train=num_c_tr, 
                                 num_classes_per_set_test=num_c_ts,
                                 num_samples_per_class=samples_per_class,
-                                nClasses=0, image_size = Constants["INPUT_SIZE"][0], best_accuracy=best_acc)
+                                nClasses=0, image_size = Constants["INPUT_SIZE"][list(Constants['TGT_DATASETS'].keys())[0]][0], best_accuracy=best_acc)
         elif model_type == "PrototypicalNetwork":
             model = PrototypicalNetwork(x_dim=3, hid_dim=64, z_dim=64)
 

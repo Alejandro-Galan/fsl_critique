@@ -1,0 +1,8 @@
+datasets
+__pycache__
+logs
+wandb
+weights*
+.cache*
+WEIGHTS
+logs_csv

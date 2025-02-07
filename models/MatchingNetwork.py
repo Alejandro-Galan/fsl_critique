@@ -8,7 +8,7 @@
 ## LICENSE file in the root directory of this source tree
 ##+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-import torch, tqdm, wandb, sys
+import torch, tqdm, wandb, sys, importlib
 import torch.nn as nn
 import unittest
 import numpy as np
@@ -19,18 +19,6 @@ from models.AttentionalClassify import AttentionalClassify
 import torch.nn.functional as F
 from torch.autograd import Variable
 from sklearn.metrics import classification_report
-
-from my_utils.constants import Const_c
-# Initialize reading the json constants file for each experiment
-exp = int(sys.argv[1])
-Constants_c = Const_c(exp)
-Constants = Constants_c.Constants
-
-
-
-
-
-
 
 
 class MatchingNetwork(nn.Module):
@@ -76,7 +64,7 @@ class MatchingNetwork(nn.Module):
         # self.XSupp=XSupp
         # self.YSupp=YSupp
 
-    def forward(self, support_set_images, support_set_labels_one_hot, target_image, target_label):
+    def forward(self, support_set_images, support_set_labels_one_hot, target_image, target_label, get_output_embeddings=False):
         """
         Builds graph for Matching Networks, produces losses and summary statistics.
         :param support_set_images: A tensor containing the support set images [batch_size, sequence_size, n_channels, 28, 28]
@@ -141,6 +129,8 @@ class MatchingNetwork(nn.Module):
         # delete the last target image encoding of encoded_images
         # encoded_images.pop()
 
+        if get_output_embeddings:
+            return accuracy, crossentropy_loss, indices.squeeze(), outputs
 
         return accuracy, crossentropy_loss, indices.squeeze()
 
