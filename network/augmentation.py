@@ -4,8 +4,8 @@ import torchvision.transforms as transforms
 from torchvision.transforms import InterpolationMode
 
 import importlib
-from my_utils import constants
-from my_utils.constants import Const_c
+from utils import constants
+from utils.constants import Const_c
 # Initialize reading the json constants file for each experiment
 exp = str(sys.argv[2])
 full_name = str(sys.argv[3])

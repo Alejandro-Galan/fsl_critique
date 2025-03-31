@@ -14,7 +14,7 @@ RUN pip install tqdm
 RUN pip install torchinfo
 RUN pip install pandas
 RUN pip install fire sudo
-
+RUN apt install graphviz -y
 
 ## User specifics
 

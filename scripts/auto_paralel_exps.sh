@@ -22,7 +22,7 @@ if [ $no_kill -eq 0 ]; then
     # Kill possible previous ghost processes
     ./scripts/paralel_executions/kill_p.sh $1
     # Kill concurrency on this experiment
-    rm -r my_utils/constants/exp$1
+    rm -r utils/constants/exp$1
 fi
 
 for ((i=1; i<=NUM_RUNS; i++))
@@ -35,5 +35,11 @@ done
 
 
 wait
+
+if [ $no_kill -eq 0 ]; then
+    # Kill concurrency on this experiment
+    rm -r utils/constants/exp$1
+fi
+
 # ./scripts/paralel_executions/kill_p.sh $1
 echo "All experiments $1 executed."

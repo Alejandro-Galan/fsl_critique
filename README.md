@@ -41,8 +41,10 @@ There are also a few relevant scripts.
 
 #### Compare datasets by predictions and generated embeddings:
 
-```python3 scripts/complementary_comparison_methods.py
+```python3 scripts/complementary_comp/main_complementary_comparison_methods.py
 ```
+
+
 
 
 ## Citations

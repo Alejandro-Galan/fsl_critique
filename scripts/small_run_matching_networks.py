@@ -5,9 +5,11 @@ sys.path.append("./")
 from train_fs import run_bootstrap as train
 
 import wandb, time
-from my_utils import constants
+from utils import constants
 importlib.reload(constants)
-from my_utils.constants import Const_c
+from utils.constants import Const_c
+
+
 
 # Initialize reading the json constants file for each experiment
 exp = str(sys.argv[2])
@@ -30,14 +32,13 @@ def run_approach_experiments(exp_name: str = "", group_exp_name: str = ""):
         if not Constants["DEACTIVATE_WANDB"]:
 
             timestamp = str(time.time()).replace(".", "")
-            exp_name_sufix = "_tgt_ds--" + ds_name + "--spc_" + str(Constants['SAMPLES_PER_CLASS']) + "--model--" + Constants['MODEL_TYPE']  
-            full_name = "logs_csv/last_exec_" + group_exp_name + "/" + exp_name + exp_name_sufix + "_.csv"
+            full_name = Const_c.get_logs_csv_path(exp, exp_name, ds_name, Constants)
             print("FULL NAME:", full_name)
 
 
             string_id_base, string_id_ft = Const_c.get_experiment_id(Constants, boots_iter=Constants["BOOTSTRAP_ITERS"] - 1) ## Assure the last iteration planned is done
             path_weights_base = "WEIGHTS/" + string_id_base 
-            finetune_path = "WEIGHTS/" + string_id_ft + "--_trained_finetuned_model.pt" 
+            finetune_path = Const_c.get_id_extensions(PARAMS=Constants, prev_str="WEIGHTS/" + string_id_ft)
 
 
 
@@ -96,7 +97,6 @@ def run_approach_experiments(exp_name: str = "", group_exp_name: str = ""):
             # history.to_csv("logs_csv/last_exec/" + exp_name + exp_name_sufix + "__" + timestamp + "_.csv", index=False)
 
     
-
 def main(exp_name, group_exp_name):
     
     if not Constants["DEACTIVATE_WANDB"]:

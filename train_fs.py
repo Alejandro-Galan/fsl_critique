@@ -14,9 +14,9 @@ from models.PrototypicalNetwork import PrototypicalNetwork
 import datasets.config as config
 import pandas as pd
 
-from datasets.loader import load_supervised_data
-from my_utils.generators import supervised_data_generator
-from my_utils.train_utils import train_test_split, write_plot_results
+from datasets.loader import load_supervised_data, convert_clustering_experiment
+from utils.generators import supervised_data_generator
+from utils.train_utils import split_train_test, write_plot_results
 from models.FewShotModel import FewShotTrain
 from network.model import (
     ResnetClassifier,
@@ -24,9 +24,9 @@ from network.model import (
     VggClassifier,
 )
 
-from my_utils import constants
+from utils import constants
 importlib.reload(constants)
-from my_utils.constants import Const_c
+from utils.constants import Const_c
 # Initialize reading the json constants file for each experiment
 exp_name = str(sys.argv[1])
 exp = str(sys.argv[2])
@@ -93,6 +93,8 @@ def run_bootstrap(
         path_weights_base = "WEIGHTS/" + string_id_base
         path_weights_base_pretrained = path_weights_base + "_trained_model.pt"
 
+        print("Base weights", path_weights_base)
+
         wandb.config.update({"src_datasets": src_datasets, "tgt_dataset": ds_name, "samples_per_class": samples_per_class, 
                             "num_total_episodes": Constants["EPISODES"], "batch_size": Constants["BATCH_SIZE"],
                             "num_bootstrap_iters": Constants["BOOTSTRAP_ITERS"], "input_size": src_input_size,
@@ -104,52 +106,66 @@ def run_bootstrap(
         torch.manual_seed(run)
         random.seed(run)
         np.random.seed(run)
+
+
+        PARAMS = {'ds_name': ds_name,"spc": samples_per_class, "nway_test": Constants["LIMIT_N_WAY_TEST"],
+                "nway_train": Constants['LIMIT_N_WAY_TRAIN'], "boots_iter": run}
+        file_stored_test_set = "utils/stored_sets/"  + PARAMS['ds_name'] + "/_spc_" + str(PARAMS['spc']) + "n_way_test_" + str(PARAMS['nway_test']) \
+                            + "_n_way_train_" + str(PARAMS['nway_train']) + "/_boots_iter_" + str(PARAMS['boots_iter']) + "_test_indexes.txt"
+        # file_stored_train_set = "utils/stored_sets/" + PARAMS['ds_name'] + "_boots_iter_" + str(PARAMS['boots_iter']) + "_train.txt"
+        # PARAMS['file_stored_test_set']  = file_stored_test_set
+        # PARAMS['file_stored_train_set'] = file_stored_train_set
+        PARAMS['file_stored_indexes_dict'] = file_stored_test_set
+        fs_set = "utils/stored_sets/" + PARAMS['ds_name'] + "/_spc_" + str(PARAMS['spc']) + "n_way_test_" + str(PARAMS['nway_test']) \
+                            + "_n_way_train_" + str(PARAMS['nway_train']) + "/_boots_iter_" + str(PARAMS['boots_iter'])
+        PARAMS['file_stored_supp_set_X']  = fs_set + "_X_" + "_supp.npy"
+        PARAMS['file_stored_supp_set_Y']  = fs_set + "_Y_" + "_supp.npy"
+
+        os.makedirs(os.path.dirname(fs_set), exist_ok=True)
         
+        pretrained_sources = os.path.exists(path_weights_base_pretrained) if Constants["ReusePretrained"] else False
         if Constants["ALL_DATASETS"] or Constants["NoSrcDataset"]:
-            pretrained_sources = os.path.exists(path_weights_base_pretrained) if Constants["ReusePretrained"] else False
             pretrained_sources = True if Constants["NoSrcDataset"] else pretrained_sources
 
             # If no validation src paramenter, Xval is empty
             data_dict = load_supervised_data(ds_name=ds_name, min_occurence=min_occurence, 
-                                            all_datasets=Constants["ALL_DATASETS"], pretrained_sources=pretrained_sources)
-            _, _, XTest, YTest, XSupp, YSupp, _, _ = train_test_split(
-                X=data_dict["X_test"],
-                Y=data_dict["Y_test"],
-                samples_per_class=samples_per_class,
-                model_type=model_type,
+                                            all_datasets=Constants["ALL_DATASETS"], pretrained_sources=pretrained_sources, boots_iter=run)
+            
+            _, _, XTest, YTest, XSupp, YSupp, _, _ = split_train_test(
+                PARAMS=PARAMS,
+                X=data_dict["X_tgt"],
+                Y=data_dict["Y_tgt"],
             )
 
             X_val, Y_val = data_dict["X_val"], data_dict["Y_val"]
             
-            XTrain, YTrain, w2i = data_dict["X_train"], data_dict["Y_train"], data_dict["w2i"]
-            if exp == "exp6":
-                namess = ["BreaKHis_formatted"]
-                for dsn in namess:
-                    ds_name = dsn
-                    data_dict = load_supervised_data(ds_name=ds_name, min_occurence=min_occurence, 
-                                            all_datasets=Constants["ALL_DATASETS"], pretrained_sources=pretrained_sources)
-                    _, _, XTest, YTest, XSupp, YSupp, _, _ = train_test_split(
-                        X=data_dict["X_test"],
-                        Y=data_dict["Y_test"],
-                        samples_per_class=samples_per_class,
-                        model_type=model_type,
-                    )
-                    instances = np.unique(YTest, return_counts=True)[1]
-                    print(ds_name, len(np.unique(YTest, return_counts=False)), "(min,max,mean) => (", 
-                        min(instances), max(instances), round(np.mean(instances)), ")",
-                        instances,
-                        "Total", len(YTest))
-                    breakpoint()
-                exit()
+            XTrain, YTrain, w2i = data_dict["X_src"], data_dict["Y_src"], data_dict["w2i"]
+
             if len(np.unique(YTest)) == 0:
                 breakpoint()
             
-        ## The whole target dataset to train/test
         else:
-            data_dict = load_supervised_data(ds_name=ds_name, min_occurence=min_occurence)
-            X, Y, w2i = data_dict["X"], data_dict["Y"], data_dict["w2i"]
-            print(f"\tTotal number of samples: {len(Y)}")
+            data_dict = load_supervised_data(ds_name=ds_name, min_occurence=min_occurence, boots_iter=run)
+
+            XTrain, YTrain, XTest, YTest, XSupp, YSupp, XVal, YVal = split_train_test(
+                PARAMS=PARAMS,
+                X=data_dict["X_tgt"], 
+                Y=data_dict["Y_tgt"],
+            )
+
+            X_val, Y_val, w2i = data_dict["X_val"], data_dict["Y_val"], data_dict["w2i"]
+
+            # print(f"\tTotal number of samples: {len(Y)}")
             print(f"\tNumber of classes: {len(w2i)}")
+
+
+        #### In case of clustering experiment
+        if Constants["CLUSTERING"]:
+            wandb.log({"CLUSTERING": Constants["CLUSTERING"], "M-labels-SRC": Constants["M-labels-SRC"]})            
+            if not pretrained_sources: # Else the weights are right, could be reused
+                XTrain, YTrain = convert_clustering_experiment(XTrain, YTrain, Constants=Constants, boots_iter=run)
+
+
         print(f"Dataset {ds_name} information:")
         print("----------------------------------------------------")
 
@@ -162,16 +178,17 @@ def run_bootstrap(
         if not Constants["DEACTIVATE_WANDB"]:
             wandb.log({"bootstrap_iter": run})            
 
-        if not Constants["ALL_DATASETS"]:
-            # 3.1) Get samples
-            XTrain, YTrain, XTest, YTest, XSupp, YSupp, X_val, Y_val = train_test_split(X=X, Y=Y, samples_per_class=samples_per_class, model_type=model_type)
+        ### Not anymore, unified with the stored files 
+        # if not Constants["ALL_DATASETS"]:
+        #     # 3.1) Get samples
+        #     XTrain, YTrain, XTest, YTest, XSupp, YSupp, X_val, Y_val = train_test_split(X=X, Y=Y, samples_per_class=samples_per_class, model_type=model_type)
 
 
         print(f"\tTotal number of samples: {len(YTrain) + len(YTest), len(Y_val)}")
         print(f"\tVal samples: {len(Y_val)}")
         print(f"\tTest samples: {len(YTest)}")
         
-        print(f"\tNumber of Source classes: {len(np.unique(YTrain)) + len(np.unique(Y_val))} ({len(np.unique(YTrain))}, {len(np.unique(Y_val))})")
+        print(f"\tNumber of Source classes (m) [Train+Val (Train, Val)]: {len(np.unique(YTrain)) + len(np.unique(Y_val))} ({len(np.unique(YTrain))}, {len(np.unique(Y_val))})")
         print(f"\tNumber of Target classes: {len(np.unique(YTest))}")
         if len(np.unique(YTest)) > len(np.unique(YTrain)) and not Constants["LIMIT_N_WAY_TRAIN"]:
             print("NUMBER OF CLASSES IN TRAIN LOWER THAN TEST")
@@ -184,7 +201,15 @@ def run_bootstrap(
         if Constants["LIMIT_N_WAY_TEST"] < 2 or Constants["LIMIT_N_WAY_TRAIN"] < 2:
             print("NUMBER OF N-WAY LOWER THAN 2, makes no sense")
             exit()
-
+            
+        if "exp6" in exp or "exp6" in exp_name:
+            variables = {name: sys.getsizeof(obj) for name, obj in globals().items()}
+            variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
+            print("GLOBALES", variables_ordenadas)
+            variables = {name: sys.getsizeof(obj) for name, obj in locals().items()}
+            variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
+            print("LOCALES", variables_ordenadas)
+            breakpoint()
 
         # 3.2) Train and test model
         class_rep, train_best_acc = train_and_test_model(
@@ -211,6 +236,16 @@ def run_bootstrap(
             accuracy = 100 * train_best_acc
 
         results.append(accuracy)
+
+        print("EEEEXP", exp)
+        if "exp6" in exp or "exp6" in exp_name:
+            variables = {name: sys.getsizeof(obj) for name, obj in globals().items()}
+            variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
+            print("GLOBALES", variables_ordenadas)
+            variables = {name: sys.getsizeof(obj) for name, obj in locals().items()}
+            variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
+            print("LOCALES", variables_ordenadas)
+            breakpoint()
 
     if results:
         # 4) SAVE RESULTS
@@ -314,25 +349,25 @@ def train_and_test_model(
         path_weights_base_pretrained = path_weights_base + "_trained_model.pt"
         
         # This is the "pretraining" on the source dataset
-        if Constants["ALL_DATASETS"]:
-            ## Train from 0
-            if not Constants["NoSrcDataset"]:
-                if not os.path.exists(path_weights_base_pretrained) or not Constants["ReusePretrained"]:
-                    os.makedirs(os.path.dirname(path_weights_base), exist_ok=True)
-                    for epoch in range(epochs):
-                        # Train matching
-                        if not Constants["DEACTIVATE_WANDB"]:
-                            wandb.log({"epoch": epoch})
+        # if Constants["ALL_DATASETS"]:
+        ## Train from 0
+        if not Constants["NoSrcDataset"]:
+            if not os.path.exists(path_weights_base_pretrained) or not Constants["ReusePretrained"]:
+                os.makedirs(os.path.dirname(path_weights_base), exist_ok=True)
+                for epoch in range(epochs):
+                    # Train matching
+                    if not Constants["DEACTIVATE_WANDB"]:
+                        wandb.log({"epoch": epoch})
 
-                        train_best_acc, train_loss, optimizer, best_class_rep = FewShotTrain.train_few_shot_net(batch_size=batch_size, encoder=model, 
-                                                                X=torch.from_numpy(XTrain), Y=torch.from_numpy(YTrain), 
-                                                                device=device, model_type=model_type, samples_per_class=samples_per_class, 
-                                                                classes_per_set=num_c_tr, optimizer= optimizer, checkpoint_path=path_weights_base,
-                                                                X_eval=torch.from_numpy(XTest), Y_eval=torch.from_numpy(YTest), metrics=metrics,
-                                                                scheduler=scheduler, X_val=X_val, Y_val=Y_val)
-                        if train_best_acc > metrics['best_accuracy']:
-                            metrics['best_accuracy'] = train_best_acc
-                            # model.best_class_rep = best_class_rep            
+                    train_best_acc, train_loss, optimizer, best_class_rep = FewShotTrain.train_few_shot_net(batch_size=batch_size, encoder=model, 
+                                                            X=torch.from_numpy(XTrain), Y=torch.from_numpy(YTrain), 
+                                                            device=device, model_type=model_type, samples_per_class=samples_per_class, 
+                                                            classes_per_set=num_c_tr, optimizer= optimizer, checkpoint_path=path_weights_base,
+                                                            X_eval=torch.from_numpy(XTest), Y_eval=torch.from_numpy(YTest), metrics=metrics,
+                                                            scheduler=scheduler, X_val=X_val, Y_val=Y_val)
+                    if train_best_acc > metrics['best_accuracy']:
+                        metrics['best_accuracy'] = train_best_acc
+                        # model.best_class_rep = best_class_rep            
 
 
         ## Trained on source datasets, fine-tune on tgt dataset
@@ -343,7 +378,9 @@ def train_and_test_model(
 
             # Load best previous model
             optimizer = torch.optim.Adam(model.parameters(), lr=Constants["lrFineTuning"], weight_decay=1e-6)
-            if Constants["ALL_DATASETS"] and not Constants["NoSrcDataset"]:
+
+            # if Constants["ALL_DATASETS"] and ### Why was I doing that?? 
+            if not Constants["NoSrcDataset"]:
                 # checkpoint = torch.load(checkpoint_path.replace("encoder.pt", "_trained_model.pt"), map_location=device)
                 checkpoint = torch.load(path_weights_base_pretrained, map_location=device)
 
@@ -358,7 +395,7 @@ def train_and_test_model(
                                         X_eval=torch.from_numpy(XTest), Y_eval=torch.from_numpy(YTest), metrics=metrics, ft_epoch_num=epoch )
 
             print("BEST TRAIN ACC", best_acc_train, "AFTER FINETUNING", metrics['best_accuracy']) 
-        
+
         return None, metrics['best_accuracy'] 
 
 

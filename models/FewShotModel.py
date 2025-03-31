@@ -2,9 +2,9 @@ import tqdm, torch, wandb, os, random, sys, importlib
 import numpy as np
 from torch.autograd import Variable
 
-from my_utils import constants
+from utils import constants
 importlib.reload(constants)
-from my_utils.constants import Const_c
+from utils.constants import Const_c
 # Initialize reading the json constants file for each experiment
 exp = str(sys.argv[2])
 full_name = str(sys.argv[3])
@@ -20,6 +20,8 @@ class FewShotTrain():
     def train_few_shot_net(batch_size, encoder, X, Y, device, classes_per_set, samples_per_class, X_eval, Y_eval, 
                            checkpoint_path, model_type="", optimizer = None, metrics=None, scheduler=None,
                            X_val=None, Y_val=None):
+
+
 
         encoder.train()
         total_c_loss = 0.0
@@ -78,6 +80,7 @@ class FewShotTrain():
                 if not Constants["DEACTIVATE_WANDB"]:
                     wandb.log({"tr_acc": acc, "tr_loss": c_loss})
                     wandb.log({"tr lr": optimizer.param_groups[0]['lr']})
+
 
                 # optimize process
                 optimizer.zero_grad()
@@ -246,7 +249,7 @@ class FewShotTrain():
                             if finetune:
                                 iter_out = "Finetune: " + set + " Accuracy: " + str(np.mean(All_acc) )
                             else:
-                                iter_out = "SrcTrain: " + set + " Accuracy: " + str(np.mean(All_acc) )
+                                iter_out = ">: " + set + " Accuracy: " + str(np.mean(All_acc) )
                         except:
                             breakpoint()
                         pbar.set_description(iter_out)
@@ -280,7 +283,7 @@ class FewShotTrain():
             encoder.eval()        
             test_accs, test_loss, test_outputs = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=X_eval, Y=Y_eval, X_train=X, Y_train=Y,
                                     device=device, model_type=model_type, supp_set=None, classes_per_set=classes_per_set, samples_per_class=samples_per_class, metrics=metrics, finetune=False)
-            wandb.log({"ft_eval_acc": test_accs, "ft_eval_loss": test_loss})
+            wandb.log({"before_ft_eval_acc": test_accs, "before_ft_eval_loss": test_loss})
 
         encoder.train()
 
@@ -376,11 +379,18 @@ class FewShotTrain():
                         # If not exists (For example if using no pretrained weights)
                         os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
 
-                        torch.save({
-                            'model_state_dict': encoder.state_dict(),
-                            'optimizer_state_dict': optimizer.state_dict(),
-                        }, checkpoint_path + "--GROUP_EXP_" + Constants["GROUP_EXPERIMENT"] + "--NWAY-test_" + str(Constants["LIMIT_N_WAY_TEST"]) + "--tgt_dataset_" + sorted(Constants["TGT_DATASETS"].keys() )[0] + "--_trained_finetuned_model.pt" )
-
+                        try:
+                            torch.save({
+                                'model_state_dict': encoder.state_dict(),
+                                'optimizer_state_dict': optimizer.state_dict(),
+                            }, Const_c.get_id_extensions(Constants, prev_str=checkpoint_path) )
+                        except:
+                            # Assuming the name is too long, lets try with a dictionary
+                            coded_path = Const_c.add_to_dictionary_of_files(Const_c.get_id_extensions(Constants, prev_str=checkpoint_path)) + ".pt"
+                            torch.save({
+                                'model_state_dict': encoder.state_dict(),
+                                'optimizer_state_dict': optimizer.state_dict(),
+                            }, coded_path )
                         epochs_no_improve = 0
 
                     else:
@@ -437,9 +447,13 @@ class FewShotTrain():
         # if set == "train":
         # np.random.shuffle(all_classes)
 
-        subset_classes = [x for x in all_classes if x != Y[exc]]
-        subset_classes = random.sample(subset_classes, classes_per_set - 1)
-        subset_classes.append(Y[exc].item())
+        try:
+            subset_classes = [x for x in all_classes if x != Y[exc]]
+            subset_classes = random.sample(subset_classes, classes_per_set - 1)
+            subset_classes.append(Y[exc].item())
+        except:
+            print(subset_classes, classes_per_set)
+            breakpoint()
         if Constants["SHUFFLE_SUPP_SET"]:
             random.shuffle(subset_classes)
         else:
@@ -447,9 +461,7 @@ class FewShotTrain():
 
         for c in subset_classes:
             index = (Y == c).nonzero(as_tuple=True)[0]
-
-
-
+                
             if Y[exc].item() == c:
                 index_ch = FewShotTrain.include_exc(exc, index, only_nk, samples_per_class)
             else:
