@@ -10,6 +10,7 @@ from sklearn.metrics import classification_report
 from torchinfo import summary
 from models.MatchingNetwork import MatchingNetwork
 from models.PrototypicalNetwork import PrototypicalNetwork
+from models.RelationNetwork import RelationNetwork
 
 import datasets.config as config
 import pandas as pd
@@ -87,6 +88,7 @@ def run_bootstrap(
         string_id_base, string_id_ft, src_datasets, src_input_size = Const_c.get_experiment_id(PARAMS=Constants, boots_iter=run, return_extra_params=True)
 
         if Const_c.all_boots_iter_done(exp, exp_name, ds_name, Constants, boots_iter=run):
+            print("Skipping bootstrap run", run, "already done on logs")
             continue
         
 
@@ -109,14 +111,14 @@ def run_bootstrap(
 
 
         PARAMS = {'ds_name': ds_name,"spc": samples_per_class, "nway_test": Constants["LIMIT_N_WAY_TEST"],
-                "nway_train": Constants['LIMIT_N_WAY_TRAIN'], "boots_iter": run}
-        file_stored_test_set = "utils/stored_sets/"  + PARAMS['ds_name'] + "/_spc_" + str(PARAMS['spc']) + "n_way_test_" + str(PARAMS['nway_test']) \
+                "nway_train": Constants['LIMIT_N_WAY_TRAIN'], "boots_iter": run, "MODEL_TYPE": Constants["MODEL_TYPE"]}
+        file_stored_test_set = "utils/stored_sets/"  + PARAMS['ds_name'] + "_" + PARAMS["MODEL_TYPE"] + "/_spc_" + str(PARAMS['spc']) + "n_way_test_" + str(PARAMS['nway_test']) \
                             + "_n_way_train_" + str(PARAMS['nway_train']) + "/_boots_iter_" + str(PARAMS['boots_iter']) + "_test_indexes.txt"
         # file_stored_train_set = "utils/stored_sets/" + PARAMS['ds_name'] + "_boots_iter_" + str(PARAMS['boots_iter']) + "_train.txt"
         # PARAMS['file_stored_test_set']  = file_stored_test_set
         # PARAMS['file_stored_train_set'] = file_stored_train_set
         PARAMS['file_stored_indexes_dict'] = file_stored_test_set
-        fs_set = "utils/stored_sets/" + PARAMS['ds_name'] + "/_spc_" + str(PARAMS['spc']) + "n_way_test_" + str(PARAMS['nway_test']) \
+        fs_set = "utils/stored_sets/"  + PARAMS['ds_name'] + "_" + PARAMS["MODEL_TYPE"] + "/_spc_" + str(PARAMS['spc']) + "n_way_test_" + str(PARAMS['nway_test']) \
                             + "_n_way_train_" + str(PARAMS['nway_train']) + "/_boots_iter_" + str(PARAMS['boots_iter'])
         PARAMS['file_stored_supp_set_X']  = fs_set + "_X_" + "_supp.npy"
         PARAMS['file_stored_supp_set_Y']  = fs_set + "_Y_" + "_supp.npy"
@@ -163,7 +165,7 @@ def run_bootstrap(
         if Constants["CLUSTERING"]:
             wandb.log({"CLUSTERING": Constants["CLUSTERING"], "M-labels-SRC": Constants["M-labels-SRC"]})            
             if not pretrained_sources: # Else the weights are right, could be reused
-                XTrain, YTrain = convert_clustering_experiment(XTrain, YTrain, Constants=Constants, boots_iter=run)
+                XTrain, YTrain = convert_clustering_experiment(XTrain, YTrain, Constants=Constants, PARAMS=PARAMS)
 
 
         print(f"Dataset {ds_name} information:")
@@ -209,7 +211,7 @@ def run_bootstrap(
             variables = {name: sys.getsizeof(obj) for name, obj in locals().items()}
             variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
             print("LOCALES", variables_ordenadas)
-            breakpoint()
+            # breakpoint()
 
         # 3.2) Train and test model
         class_rep, train_best_acc = train_and_test_model(
@@ -230,7 +232,7 @@ def run_bootstrap(
             Y_val=torch.from_numpy(Y_val),
         )
         # NOTE: So far, only accuracy is saved
-        if model_type != "MatchingNetwork" and model_type != "PrototypicalNetwork":
+        if model_type not in Constants['AllowedModels']:
             accuracy = 100 * class_rep["accuracy"]
         else:
             accuracy = 100 * train_best_acc
@@ -245,7 +247,7 @@ def run_bootstrap(
             variables = {name: sys.getsizeof(obj) for name, obj in locals().items()}
             variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
             print("LOCALES", variables_ordenadas)
-            breakpoint()
+            # breakpoint()
 
     if results:
         # 4) SAVE RESULTS
@@ -310,7 +312,7 @@ def train_and_test_model(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"USING DEVICE: {device}")
 
-    if model_type == "MatchingNetwork" or model_type == "PrototypicalNetwork":
+    if model_type in Constants['AllowedModels']:
         if not Constants["LIMIT_N_WAY_TRAIN"] or not Constants["LIMIT_N_WAY_TEST"]:
             num_c_tr = min(len(np.unique(YTrain)), len(np.unique(YTest)))
             num_c_ts = num_c_tr
@@ -328,11 +330,21 @@ def train_and_test_model(
                                 nClasses=0, image_size = Constants["INPUT_SIZE"][list(Constants['TGT_DATASETS'].keys())[0]][0], best_accuracy=best_acc)
         elif model_type == "PrototypicalNetwork":
             model = PrototypicalNetwork(x_dim=3, hid_dim=64, z_dim=64)
-
+        elif model_type == "RelationNetwork":
+            model = RelationNetwork(feature_dimension=64, ds_name=list(Constants['TGT_DATASETS'].keys())[0], spc=samples_per_class, input_size=Constants["INPUT_SIZE"][list(Constants['TGT_DATASETS'].keys())[0]][0]).to(device)
+            
+            
         model = model.to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=Constants["lr"], weight_decay=Constants["weight_decay"])
-        # Reduce lr per half every 20 epochs
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=Constants["step_size"], gamma=0.5)
+        if model_type == "RelationNetwork":
+            model.feature_encoder_optim = torch.optim.Adam(model.feature_encoder.parameters(),lr=Constants["lr"])
+            model.feature_encoder_scheduler = torch.optim.lr_scheduler.StepLR(model.feature_encoder_optim,step_size=Constants["step_size"],gamma=0.5)
+            model.relation_network_optim = torch.optim.Adam(model.relation_network.parameters(),lr=Constants["lr"])
+            model.relation_network_scheduler = torch.optim.lr_scheduler.StepLR(model.relation_network_optim,step_size=Constants["step_size"],gamma=0.5)
+            optimizer, scheduler = None, None
+        else:
+            optimizer = torch.optim.Adam(model.parameters(), lr=Constants["lr"], weight_decay=Constants["weight_decay"])
+            # Reduce lr per half every 20 epochs
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=Constants["step_size"], gamma=0.5)
 
 
     else:
@@ -342,7 +354,7 @@ def train_and_test_model(
     model = model.to(device)
     
     
-    if model_type == "MatchingNetwork" or model_type == "PrototypicalNetwork":
+    if model_type in Constants['AllowedModels']:
 
         metrics = {'XSupp': XSupp, 'YSupp': YSupp, 'best_accuracy': 0.0, 'PATIENCE': Constants["PATIENCE"]}
 
@@ -352,6 +364,8 @@ def train_and_test_model(
         # if Constants["ALL_DATASETS"]:
         ## Train from 0
         if not Constants["NoSrcDataset"]:
+            if Constants["ReusePretrained"] and not os.path.exists(path_weights_base_pretrained):
+                print("Weights not found, training from scratch", path_weights_base_pretrained)
             if not os.path.exists(path_weights_base_pretrained) or not Constants["ReusePretrained"]:
                 os.makedirs(os.path.dirname(path_weights_base), exist_ok=True)
                 for epoch in range(epochs):
@@ -384,8 +398,12 @@ def train_and_test_model(
                 # checkpoint = torch.load(checkpoint_path.replace("encoder.pt", "_trained_model.pt"), map_location=device)
                 checkpoint = torch.load(path_weights_base_pretrained, map_location=device)
 
-                # (Initialize only the encoder)
-                model.load_state_dict(checkpoint['model_state_dict'])
+                if model_type == "RelationNetwork":
+                    model.feature_encoder.load_state_dict(checkpoint['feature_encoder'])  
+                    model.relation_network.load_state_dict(checkpoint['relation_network'])  
+                else:
+                    # (Initialize only the encoder)
+                    model.load_state_dict(checkpoint['model_state_dict'])
 
             for epoch in range(Constants["epochsFineTuning"]):
                 train_best_acc, train_loss, optimizer, best_class_rep = FewShotTrain.finetune_few_shot_net(batch_size=batch_size, encoder=model, 

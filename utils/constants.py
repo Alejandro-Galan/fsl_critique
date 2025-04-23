@@ -33,14 +33,27 @@ class Const_c():
         params = Const_c.adjust_parameters(params)
         self.Constants = params
 
+
+        # python3 scripts/small_run_matching_networks.py exp6_permuted_src_datasets--src_ds_Egyptian exp6 RelationNetwork-4000_E-40x40_I_S/False_FSS-Egyptian-5_NWAY_TRAIN-16_Batch_Size-5_KSpC-0.001_lr-0.0_ValSrc-GROUP_EXP_source_permutation-NWAY-test_5-tgt_ds_b-59-850 
+
         if "6" in exp_num: 
-            params['SAMPLES_PER_CLASS'] = 5
-            params['MODEL_TYPE'] = 'PrototypicalNetwork'
-            params['DATASETS_NAMES'] = {Const_c.DATASETS.TKH.value: {}}
-            params['OVERWRITE_LOGS'] = True
-            params["EPISODES"] = 10
-            params["BOOTSTRAP_ITERS"] = 1
-            params["epochsFineTuning"] = 1
+            params['SAMPLES_PER_CLASS'] = 1 #1 #5
+            params['MODEL_TYPE'] = 'PrototypicalNetwork' #'RelationNetwork'
+            params['DATASETS_NAMES'] =  {'NO_SRC_DATASET': {}} #{"omniglot_SOTA_trainvalSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_trainSet": {}}
+            params['TGT_DATASETS']   =  {Const_c.DATASETS.CAPITAN.value: {}} #{"omniglot_SOTA_testSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_trainSet": {}}
+            params['OVERWRITE_LOGS'] = False
+            params["EPISODES"] = 4000 #20000
+            params["BOOTSTRAP_ITERS"] = 5
+            params["epochsFineTuning"] = 1 #3
+            params["BATCH_SIZE"] = 16 #16
+            params["LIMIT_N_WAY_TRAIN"] = 5
+            params["LIMIT_N_WAY_TEST"] = 5
+            
+            
+            params["NoSrcDataset"] = True
+
+            # params["CLUSTERING"] = "CONSTRAINED-KMEANS"
+            # params["M-labels-SRC"] = 1000
             # params["SMALL_TEST_SET"] = True
 
 
@@ -156,25 +169,44 @@ class Const_c():
         return df
 
     def get_logs_csv_path(exp, exp_name, ds_name, Constants):
-        exp_name_sufix = "_tgt_ds--" + ds_name + "--spc_" + str(Constants['SAMPLES_PER_CLASS']) + "--model--" + Constants['MODEL_TYPE']  
+        exp_name_sufix = "_tgt_ds-" + ds_name + "-spc_" + str(Constants['SAMPLES_PER_CLASS']) + "-model-" + Constants['MODEL_TYPE']  
         # if Constants['LIMIT_N_WAY_TRAIN'] > 5:
-        exp_name_sufix += "--" + str(Constants['LIMIT_N_WAY_TRAIN']) + "-nwayTrain"
+        exp_name_sufix += "-" + str(Constants['LIMIT_N_WAY_TRAIN']) + "-nwayTrain"
         # else:
-        exp_name_sufix += "--" + str(5) + "-nwayTrain"
+        # exp_name_sufix += "--" + str(5) + "-nwayTrain"
         return "logs_csv/last_exec_" + exp + "/" + exp_name + exp_name_sufix + "_.csv"
+
+
+
 
     # If False, must be executed again
     def all_boots_iter_done(exp, exp_name, ds_name, Constants, boots_iter):
         path_logs = Const_c.get_logs_csv_path(exp, exp_name, ds_name, Constants)
 
+
         if os.path.exists(path_logs):
+            if boots_iter == Constants["BOOTSTRAP_ITERS"]:
+                print("Path logs already exists", path_logs)
             df = pd.read_csv(path_logs)
             df = Const_c.update_filter_search(df, Constants)
-            if boots_iter in df['bootstrap_iter'].values:
-                print("Execution not finished but boots iter", boots_iter, "Already done")
-                return True
-
-        return False
+            # Check until that iteration
+            for b_it in range(boots_iter):
+                if not b_it in df['bootstrap_iter'].values:
+                    print("Execution not finished in boots iter", boots_iter, "boots iteration")
+                    return False
+                df_boots = df[df['bootstrap_iter'] == b_it]
+                if not "before_ft_eval_acc" in df_boots.columns:
+                    return False
+                # Check if all cells of column 'tr_eval_acc' are not empty
+                if not (df_boots['before_ft_eval_acc'].notna()).any():
+                    print("Empty cells of before_ft_eval_acc", boots_iter, "boots iteration")
+                    breakpoint()
+                    return False
+                
+            return True
+        else: 
+            print("Path logs does not exist", path_logs)
+            return False
     
     def read_dictionaly_of_files(filename):
         dict_files_path = "utils/dictionary_of_files.csv"
@@ -236,9 +268,11 @@ class Const_c():
         "miniImageNet_SOTA_testSet"  : (84,84),
         "miniImageNet_SOTA_trainSet" : (84,84),
     }
+    
 
 
-    BASE_PARAMETERS["MODEL_TYPE"] = [ "PrototypicalNetwork", "MatchingNetwork"] #["PrototypicalNetwork"] #["MatchingNetwork"]
+    BASE_PARAMETERS["AllowedModels"] = [ "PrototypicalNetwork", "MatchingNetwork", "RelationNetwork" ]
+    BASE_PARAMETERS["MODEL_TYPE"] = [ "PrototypicalNetwork", "MatchingNetwork"] 
 
     BASE_PARAMETERS["EPOCHS"] = 1 #500 #20 #500 #150
     BASE_PARAMETERS["EPISODES"] = 4000 #1000 #1000 #1000
@@ -321,6 +355,7 @@ class Const_c():
     #### Clustering experiment / proposal. Expecting type
     BASE_PARAMETERS["CLUSTERING"]   = ""
     BASE_PARAMETERS["M-labels-SRC"] = -1 # If -1, m = n
+    
 
 
     # greek_comparative = False

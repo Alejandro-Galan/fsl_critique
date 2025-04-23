@@ -63,7 +63,7 @@ def write_plot_results(
 def extract_support_set(X, Y, samples_per_class, model_type):
 
 
-    if model_type == "MatchingNetwork" or model_type == "PrototypicalNetwork":
+    if model_type in Constants['AllowedModels']:
         supp_X, supp_Y = [], []
         reduced_X, reduced_Y = [], []
         # Extract in sequential order to preserve always the same 

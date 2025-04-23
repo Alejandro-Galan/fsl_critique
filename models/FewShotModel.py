@@ -37,10 +37,10 @@ class FewShotTrain():
         os.makedirs(os.path.dirname(new_path), exist_ok=True )
         
         cps_test, cps_train = classes_per_set, classes_per_set
-        if Constants["LIMIT_N_WAY_TRAIN"]:
-            cps_train = Constants["LIMIT_N_WAY_TRAIN"]
-        if Constants["LIMIT_N_WAY_TEST"]:
-            cps_test = Constants["LIMIT_N_WAY_TEST"]
+        # if Constants["LIMIT_N_WAY_TRAIN"]:
+        #     cps_train = Constants["LIMIT_N_WAY_TRAIN"]
+        # if Constants["LIMIT_N_WAY_TEST"]:
+        #     cps_test = Constants["LIMIT_N_WAY_TEST"]
 
         # total_train_batches = (X.shape[0] + batch_size - 1) // batch_size
         # total_train_batches = X.shape[0] // batch_size
@@ -56,7 +56,8 @@ class FewShotTrain():
                 index_batch = np.random.choice(X.shape[0], batch_size, replace=False)
                 x_support_set, y_support_set, x_target, y_target = FewShotTrain.get_subsamples_sets(X, Y, index_batch, model_type=model_type, metrics=metrics, 
                                                                                                     classes_per_set=cps_train, samples_per_class=samples_per_class)
-                
+                np.testing.assert_equal(x_support_set.shape[1], classes_per_set * samples_per_class)
+
                 x_support_set = Variable(torch.from_numpy(x_support_set)).float()
                 y_support_set = Variable(torch.from_numpy(y_support_set), requires_grad=False).long()
                 x_target = Variable(torch.from_numpy(x_target)).float()
@@ -72,28 +73,36 @@ class FewShotTrain():
                 y_support_set_one_hot = Variable(y_support_set_one_hot)
 
                 if model_type == "MatchingNetwork":
-                    acc, c_loss, outs = encoder(support_set_images=x_support_set.cuda(), support_set_labels_one_hot=y_support_set_one_hot.cuda(), target_image=x_target.cuda(), target_label=y_target.cuda())
+                    acc, c_loss, outs = encoder(support_set_images=x_support_set.cuda(), 
+                                    support_set_labels_one_hot=y_support_set_one_hot.cuda(), target_image=x_target.cuda(), target_label=y_target.cuda())
                 elif model_type == "PrototypicalNetwork":
                     all_outputs, inputs_y = PrototypicalNetwork.get_outputs(x_target, y_target, x_support_set, y_support_set, encoder)
                     acc, c_loss = prototypical_loss(all_outputs, target=inputs_y, n_support=samples_per_class, samples_per_class=samples_per_class, batch_size=batch_size)
+                elif model_type == "RelationNetwork":
+                    acc, c_loss, outs = encoder(x_support_set.cuda(), y_support_set.cuda(), x_target.cuda(), y_target.cuda(), 
+                                    train=True, SAMPLE_NUM_PER_CLASS=samples_per_class, CLASS_NUM=classes_per_set)
 
                 if not Constants["DEACTIVATE_WANDB"]:
                     wandb.log({"tr_acc": acc, "tr_loss": c_loss})
-                    wandb.log({"tr lr": optimizer.param_groups[0]['lr']})
+                    if not model_type == "RelationNetwork":
+                        wandb.log({"tr lr": optimizer.param_groups[0]['lr']})
 
+                # It is done inside the model
+                if not model_type == "RelationNetwork":
+                    # optimize process
+                    optimizer.zero_grad()
+                    c_loss.backward()
+                    optimizer.step()
+                    for _ in range(batch_size):
+                        scheduler.step()
 
-                # optimize process
-                optimizer.zero_grad()
-                c_loss.backward()
-                optimizer.step()
-                for _ in range(batch_size):
-                    scheduler.step()
-
-                FewShotTrain.adjust_learning_rate(optimizer)
+                    FewShotTrain.adjust_learning_rate(optimizer)
 
                 total_c_loss += c_loss.item()
                 total_accuracy += acc.item()
-                iter_out = "tr_loss: {}, tr_accuracy: {}, lr: {}".format(total_c_loss/(i+1), acc.item(), optimizer.param_groups[0]['lr'])
+                iter_out = "tr_loss: {}, tr_accuracy: {}, mean_tr_acc: {}".format(total_c_loss/(i+1), acc.item(), total_accuracy/(i+1))
+                if not model_type == "RelationNetwork":
+                    iter_out += ", lr: {}".format(optimizer.param_groups[0]['lr'])
                 pbar.set_description(iter_out)
                 pbar.update(1)
 
@@ -117,11 +126,7 @@ class FewShotTrain():
                         best_epoch = i
                         # metrics['best_class_rep'] = classification_report(y_true=Y_eval.cpu().tolist(), y_pred=test_outputs.cpu(), output_dict=True)
 
-                        ## If fine tune, evaluating with this is cheating (if test or tgt data, of course)
-                        torch.save({
-                            'model_state_dict': encoder.state_dict(),
-                            'optimizer_state_dict': optimizer.state_dict(),
-                        }, new_path )
+                        FewShotTrain.store_encoder(encoder, optimizer=optimizer, new_path=new_path, model_type=model_type)
 
                         epochs_no_improve = 0
 
@@ -148,10 +153,7 @@ class FewShotTrain():
         # Otherwise the best is already saved
         if not Constants["VALIDATION_SRC_SRC_DATA"]:
 
-            torch.save({
-                'model_state_dict': encoder.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-            },  new_path)
+            FewShotTrain.store_encoder(encoder, optimizer=optimizer, new_path=new_path, model_type=model_type)
 
 
         return metrics['best_accuracy'], best_epoch, optimizer, None
@@ -236,9 +238,12 @@ class FewShotTrain():
                         elif model_type == "PrototypicalNetwork":
                             output, inputs_y = PrototypicalNetwork.get_outputs(x_target, y_target, x_support_set, y_support_set, encoder)
                             acc, c_loss = prototypical_loss(output, target=inputs_y, n_support=samples_per_class, samples_per_class=samples_per_class, batch_size=batch_size)
-        
+                        elif model_type == "RelationNetwork":
+                            acc, c_loss, output = encoder(x_support_set.cuda(), y_support_set.cuda(), x_target.cuda(), y_target.cuda(), train=False, SAMPLE_NUM_PER_CLASS=samples_per_class, CLASS_NUM=classes_per_set)
+
 
                         All_acc.append(acc.cpu().item())
+
                         if output.dim() == 0:
                             All_out.append(output.unsqueeze(0) )
                         else:                              
@@ -333,16 +338,22 @@ class FewShotTrain():
                 elif model_type == "PrototypicalNetwork":
                     all_outputs, inputs_y = PrototypicalNetwork.get_outputs(x_target, y_target, x_support_set, y_support_set, encoder)
                     acc, c_loss = prototypical_loss(all_outputs, target=inputs_y, n_support=samples_per_class, samples_per_class=samples_per_class, batch_size=batch_size)
+                elif model_type == "RelationNetwork":
+                    acc, c_loss, outs = encoder(x_support_set.cuda(), y_support_set.cuda(), x_target.cuda(), y_target.cuda(), train=True, SAMPLE_NUM_PER_CLASS=samples_per_class, CLASS_NUM=classes_per_set)
+
 
                 if not Constants["DEACTIVATE_WANDB"]:
                     wandb.log({"ft_acc": acc, "ft_loss": c_loss})
 
-                # optimize process
-                optimizer.zero_grad()
-                c_loss.backward()
-                optimizer.step()
 
-                FewShotTrain.adjust_learning_rate(optimizer)
+                # It is done inside the model
+                if not model_type == "RelationNetwork":
+                    # optimize process
+                    optimizer.zero_grad()
+                    c_loss.backward()
+                    optimizer.step()
+
+                    FewShotTrain.adjust_learning_rate(optimizer)
 
                 total_c_loss += c_loss.item()
                 total_accuracy += acc.item()
@@ -358,7 +369,7 @@ class FewShotTrain():
                 # if True:
                     encoder.eval()
                     # supp_set = {"imgs": X, "labels": Y}
-                    # supp_set = {"imgs": self.XSupp, "labels": self.YSupp} ## TODO which supp to choose
+                    # supp_set = {"imgs": self.XSupp, "labels": self.YSupp} 
                     
                     test_accs, test_loss, test_outputs = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=X_eval, Y=Y_eval, X_train=X, Y_train=Y,
                                             device=device, model_type=model_type, supp_set=None, classes_per_set=classes_per_set, samples_per_class=samples_per_class, metrics=metrics, finetune=True)
@@ -380,17 +391,12 @@ class FewShotTrain():
                         os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
 
                         try:
-                            torch.save({
-                                'model_state_dict': encoder.state_dict(),
-                                'optimizer_state_dict': optimizer.state_dict(),
-                            }, Const_c.get_id_extensions(Constants, prev_str=checkpoint_path) )
+                            new_path = Const_c.get_id_extensions(Constants, prev_str=checkpoint_path)
+                            FewShotTrain.store_encoder(encoder, optimizer=optimizer, new_path=new_path, model_type=model_type)
                         except:
                             # Assuming the name is too long, lets try with a dictionary
                             coded_path = Const_c.add_to_dictionary_of_files(Const_c.get_id_extensions(Constants, prev_str=checkpoint_path)) + ".pt"
-                            torch.save({
-                                'model_state_dict': encoder.state_dict(),
-                                'optimizer_state_dict': optimizer.state_dict(),
-                            }, coded_path )
+                            FewShotTrain.store_encoder(encoder, optimizer=optimizer, new_path=coded_path, model_type=model_type)
                         epochs_no_improve = 0
 
                     else:
@@ -404,6 +410,22 @@ class FewShotTrain():
 
         return metrics['best_accuracy'], best_epoch, optimizer, None
 
+
+    def store_encoder(encoder, optimizer, new_path, model_type):
+        if model_type == "RelationNetwork":
+            torch.save({
+                'feature_encoder': encoder.feature_encoder.state_dict(),
+                'relation_network': encoder.relation_network.state_dict(),
+                'feature_encoder_optimizer_state_dict': encoder.feature_encoder_optim.state_dict(),
+                'relation_network_optimizer_state_dict': encoder.relation_network_optim.state_dict(),
+            }, new_path )
+
+        else:
+            ## If fine tune, evaluating with this is cheating (if test or tgt data, of course)
+            torch.save({
+                'model_state_dict': encoder.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+            }, new_path )
 
 
     def adjust_learning_rate( optimizer):
@@ -477,8 +499,9 @@ class FewShotTrain():
                 
             all_index = all_index + list(index_ch)
         if Constants["SHUFFLE_SUPP_SET"]:
-            np.random.shuffle(all_index) # TODO LSTM importa?
+            np.random.shuffle(all_index) 
 
+        np.testing.assert_equal(len(all_index), classes_per_set*samples_per_class)
 
         return all_index
 
@@ -491,25 +514,24 @@ class FewShotTrain():
     # Convert every episode classes to a transcription of size "num_classes_per_set"
     def codify_subset_classes( supp, exc, max_c, model_type):
 
-        #### TODO TEMPORAL DEBUG
         return supp, exc
 
-        new_vec = np.append(supp, exc)
-        classes = {}
+        # new_vec = np.append(supp, exc)
+        # classes = {}
         
-        for e in range(len(new_vec)):
-            class_ = new_vec[e]
-            if class_ not in classes:
-                classes[class_] = len(classes)
-            new_vec[e] = classes[class_]
+        # for e in range(len(new_vec)):
+        #     class_ = new_vec[e]
+        #     if class_ not in classes:
+        #         classes[class_] = len(classes)
+        #     new_vec[e] = classes[class_]
 
-        try:
-            assert len(classes) == max_c 
-        except:
-            breakpoint()
-        supp_v, query_v = new_vec[:len(supp)], new_vec[len(supp):]
+        # try:
+        #     assert len(classes) == max_c 
+        # except:
+        #     breakpoint()
+        # supp_v, query_v = new_vec[:len(supp)], new_vec[len(supp):]
         
-        return supp_v, query_v
+        # return supp_v, query_v
 
     def get_subsamples_sets( X, Y, index_batch, classes_per_set, metrics, model_type="", 
                             samples_per_class=1, set="train", only_nk=False, change_classes_alias=False):
@@ -530,9 +552,12 @@ class FewShotTrain():
         if model_type == "PrototypicalNetwork":
             target_x = np.zeros((batch_size, classes_per_set, X.shape[1], X.shape[2], X.shape[3]), np.float32)
             target_y = np.zeros((batch_size, classes_per_set), np.int32)
-        else:
+        elif model_type == "MatchingNetwork":
             target_x = np.zeros((batch_size, X.shape[1], X.shape[2], X.shape[3]), np.float32)
             target_y = np.zeros((batch_size, 1), np.int32)
+        elif model_type == "RelationNetwork":
+            target_x = np.zeros((batch_size, classes_per_set, X.shape[1], X.shape[2], X.shape[3]), np.float32)
+            target_y = np.zeros((batch_size, classes_per_set), np.int32)
 
         if condition == "prefixed_support_set":
 
@@ -549,8 +574,10 @@ class FewShotTrain():
 
                 if model_type == "PrototypicalNetwork":
                     exc, y_supp = get_multiple_querys(exc, Y, metrics['YSupp'], only_nk)
-                else:
+                elif model_type == "MatchingNetwork":
                     exc, y_supp = get_one_query(exc, Y, metrics['YSupp'], only_nk)
+                elif model_type == "RelationNetwork":
+                    exc, y_supp = get_multiple_querys(exc, Y, metrics['YSupp'], only_nk)
 
                 # change Y labels to equal size of num_classes 
                 if Y[exc].item() not in y_supp:
@@ -582,15 +609,22 @@ class FewShotTrain():
                                         X.shape[1], X.shape[2], X.shape[3]), np.float32)
             support_set_y = np.zeros((batch_size, total_data), np.int32)
 
+            # In case of RN, repeat the supp all batches
+            first_supp = False
+
             for b in range(batch_size):
                 exc = index_batch[b]
-
+                
+                # if not first_supp or not model_type == "RelationNetwork":
                 supp_index = FewShotTrain.get_support_set_index(Y, exc, max_c, samples_per_class, only_nk=only_nk)
+                    # first_supp = True
+
                 if model_type == "PrototypicalNetwork":
                     exc = get_multiple_querys(exc, Y, supp_index)
                 elif model_type == "MatchingNetwork":
                     exc = get_one_query(exc, Y, supp_index, only_nk)
-                    
+                elif model_type == "RelationNetwork":
+                    exc = get_multiple_querys(exc, Y, supp_index)
 
 
                 # change Y labels to equal size of num_classes 
@@ -618,7 +652,6 @@ class FewShotTrain():
 
             for i in range(batch_size):
                 # classes_idx = np.arange(X.shape[0])
-                # TODO: Check if trains better with a subset than with all available
                 # choose_classes = np.random.choice(classes_idx, size=classes_per_set, replace=False)
 
                 choose_classes = np.arange(X.shape[0]) # Use all examples

@@ -3,7 +3,7 @@
 
 import os, glob
 import pandas as pd
-
+import numpy as np
 
 def extract_metadata_from_namefile(f_name):
     metadata = {}
@@ -76,8 +76,32 @@ def extend_and_remove_non_relevant_rows(df):
             counter = 0
         new_df.loc[idx, 'ft_eval_num'] = counter
         counter += 1
+
     df = new_df
-    # Select rows where ft_eval_acc is empty
+    
+    
+
+    # Remove rows where before_ft_eval_acc is empty
+    # df = df[~df['before_ft_eval_acc'].isnull()]
+    # Or where before_ft_eval_acc is ""
+    df = df[~df['before_ft_eval_acc'].isin(["", " ", "nan"])]
+
+    # Mean rows where everything is the same except for ft_eval_acc
+    df = df.groupby(["bootstrap_iter","lr","batch_size","input_size","model_type","n_way_test","n_way_train","tgt_dataset","src_datasets","fixed_support","samples_per_class","num_total_episodes","num_bootstrap_iters","exp_name","ft_eval_num"])
+
+    means, stds = [], []
+    # Size of each group
+    for name, group in df:
+        means.append(len(group))
+        stds.append(group['ft_eval_acc'].std())
+        if group['ft_eval_acc'].std() > 0:
+            breakpoint()
+
+        if len(group) > 1:
+            breakpoint()
+
+    df = df.mean(numeric_only=True).reset_index()
+
     return df
 
 
@@ -99,6 +123,9 @@ def comprobations_coherence_columns(df):
 
 
 logs_base_path = "logs_csv/"
+
+# Fix migrations
+# os.system("python3 scripts/fix_migrations_id.py")
 
 ## Extract data by num_experiments and group:
 for root, folders, files in os.walk(logs_base_path):

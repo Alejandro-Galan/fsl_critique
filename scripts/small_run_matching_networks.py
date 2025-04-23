@@ -44,15 +44,20 @@ def run_approach_experiments(exp_name: str = "", group_exp_name: str = ""):
 
             if not Constants["OVERWRITE_LOGS"]:
                 if os.path.exists(full_name):
-                    if os.path.exists(path_weights_base + "_trained_model.pt"):
-                        if not os.path.exists(finetune_path) or not Const_c.all_boots_iter_done(exp, exp_name, ds_name, Constants, boots_iter=Constants["BOOTSTRAP_ITERS"] - 1):
-                            print("Althogh existing, Model stored but finetuning not found. Not skipped")
-                        # If exists and all boots iter were executed
-                        else:
-                            print("Skipping experiment already on logs", exp_name + exp_name_sufix)
-                            continue
-                    else:
-                        print("Weights not found")
+                    if Const_c.all_boots_iter_done(exp, exp_name, ds_name, Constants, boots_iter=Constants["BOOTSTRAP_ITERS"] - 1):
+                        print("Skipping whole exp, all", Constants["BOOTSTRAP_ITERS"], "boots iters already done on logs")
+                        continue
+                    
+                    # ## Only the logs matter
+                    # if os.path.exists(path_weights_base + "_trained_model.pt"):
+                    #     if not os.path.exists(finetune_path) or not Const_c.all_boots_iter_done(exp, exp_name, ds_name, Constants, boots_iter=Constants["BOOTSTRAP_ITERS"] - 1):
+                    #         print("Althogh existing, Model stored but finetuning not found. Not skipped")
+                    #     # If exists and all boots iter were executed
+                    #     else:
+                    #         print("Skipping experiment already on logs", exp_name)
+                    #         continue
+                    # else:
+                    #     print("Weights not found")
 
             run = wandb.init(
                 project="small-run-matching-networks-SSL-symbols", 
