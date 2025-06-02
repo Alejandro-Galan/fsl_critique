@@ -1,0 +1,36 @@
+{
+    "NWAY": {
+        "1": 5,
+        "3": 5,
+        "4": 5,
+        "10": 5
+    },
+    "SPC_OW": {
+        "1": [
+            1,5
+        ],
+        "3": [
+            1,5
+        ],
+        "4": [
+            5
+        ],
+        "10": [
+            5
+        ]
+    },
+    "MODEL_TS": {
+        "1": [
+            "MatchingNetwork", "PrototypicalNetwork"
+        ],
+        "3": [
+            "MatchingNetwork", "PrototypicalNetwork"
+        ],
+        "4": [
+            "PrototypicalNetwork"
+        ],
+        "10": [
+            "PrototypicalNetwork"
+        ]
+    }
+}

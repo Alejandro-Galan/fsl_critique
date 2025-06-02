@@ -1,0 +1,48 @@
+from collections import Counter
+from operator import itemgetter
+from typing import Tuple
+
+import cv2, sys
+import numpy as np
+
+import importlib
+from utils import constants
+from utils.constants import Const_c
+# Initialize reading the json constants file for each experiment
+exp = str(sys.argv[2])
+full_name = str(sys.argv[3])
+Constants_c = Const_c(exp, full_name)
+Constants = Constants_c.Constants
+
+
+def preprocess_image(image: np.ndarray, resize: bool = True) -> np.ndarray:
+    if resize:
+        image = cv2.resize(
+            image, Constants["INPUT_SIZE"][list(Constants['TGT_DATASETS'].keys())[0]], interpolation=cv2.INTER_AREA
+        )  # Resize
+    image = image / 255  # Normalize
+    image = np.transpose(image, (2, 0, 1))  # HWC -> CHW
+    image = image.astype(np.float32)
+    return image
+
+
+def get_w2i_dictionary(labels: list) -> dict:
+    labels = sorted(set(labels))
+    w2i = dict(zip(labels, range(len(labels))))
+    return w2i
+
+
+def filter_by_occurrence(
+    bboxes: list, labels: list, min_occurence: int = 10
+) -> Tuple[list, list]:
+    label_occurence_dict = Counter(labels)
+    ids_kept = [
+        id
+        for id, label in enumerate(labels)
+        if label_occurence_dict[label] >= min_occurence
+    ]
+    filtered_bboxes = list(itemgetter(*ids_kept)(bboxes))
+    filtered_labels = list(itemgetter(*ids_kept)(labels))
+    print(f"Removing labels that appear less than {min_occurence} times")
+    print(f"Before: {len(labels)} samples, After: {len(filtered_labels)} samples")
+    return filtered_bboxes, filtered_labels
