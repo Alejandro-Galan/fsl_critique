@@ -47,19 +47,22 @@ In that function, all the datasets are loaded without partition sets.
 
 To execute an experiment, please execute this line
 
-```python3 ./scripts/auto_paralel_exps.sh <experiment_number> <simultaneous_executions>
+```
+python3 ./scripts/auto_paralel_exps.sh <experiment_number> <simultaneous_executions>
 ```
 
 There are also a few relevant scripts. 
 
 #### Extract the logs into simpler tables:
 
-```python3 logs_csv/filter_logs_csv.py
+```
+python3 logs_csv/filter_logs_csv.py
 ```
 
 #### Compare datasets by predictions and generated embeddings:
 
-```python3 scripts/complementary_comp/main_complementary_comparison_methods.py
+```
+python3 scripts/complementary_comp/main_complementary_comparison_methods.py
 ```
 
 
