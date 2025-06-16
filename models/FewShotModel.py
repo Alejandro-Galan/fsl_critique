@@ -115,9 +115,9 @@ class FewShotTrain():
                 if Constants["VALIDATION_SRC_SRC_DATA"] and (i + 1) % limit_valSRC == 0:
                     encoder.eval()
 
-                    test_accs, test_loss, test_outputs, dists = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=X_val, Y=Y_val, X_train=X, Y_train=Y,
+                    test_accs_std, test_loss, test_outputs, dists = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=X_val, Y=Y_val, X_train=X, Y_train=Y,
                                             device=device, model_type=model_type, supp_set=None, classes_per_set=cps_test, samples_per_class=samples_per_class, metrics=metrics, set="Val")
-
+                    test_accs = test_accs_std[0] 
                     if not Constants["DEACTIVATE_WANDB"]:
                         wandb.log({"tr_eval_acc_src_data": test_accs, "tr_eval_loss_src_data": test_loss})
 
@@ -140,9 +140,9 @@ class FewShotTrain():
 
                 if Constants["VALIDATION_SRC_TGT_DATA"] and (i + 1) % limit_valTGT == 0:
                                             
-                    test_accs, test_loss, test_outputs, dists = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=X_eval, Y=Y_eval, X_train=X, Y_train=Y,
+                    test_accs_std, test_loss, test_outputs, dists = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=X_eval, Y=Y_eval, X_train=X, Y_train=Y,
                                             device=device, model_type=model_type, supp_set=None, classes_per_set=cps_test, samples_per_class=samples_per_class, metrics=metrics)
-
+                    test_accs = test_accs_std[0]
                     # print("TEST ACCS", test_accs)
                     if not Constants["DEACTIVATE_WANDB"]:
                         wandb.log({"tr_eval_acc": test_accs, "tr_eval_loss": test_loss})
@@ -270,12 +270,12 @@ class FewShotTrain():
                 # Asegúrate de actualizar la barra de progreso al final
                 pbar.update(total_test_batches - pbar.n)
         if not All_out:
-            return np.mean(All_acc), None, None, All_dists
-        return np.mean(All_acc), None, torch.cat(All_out), All_dists
+            return [np.mean(All_acc), np.std(All_acc)], None, None, All_dists
+        return [np.mean(All_acc), np.std(All_acc)], None, torch.cat(All_out), All_dists
 
 
-    def finetune_few_shot_net(batch_size, encoder, X, Y, device, classes_per_set, samples_per_class, X_eval, Y_eval, checkpoint_path, 
-                           model_type="", optimizer = None, metrics=None, ft_epoch_num=0):
+    def finetune_few_shot_net(batch_size, encoder, X, Y, device, classes_per_set, samples_per_class, X_eval, Y_eval, checkpoint_path, boots_iter, 
+                           model_type="", optimizer = None, metrics=None, ft_epoch_num=0, reuse_logs=True):
 
         total_c_loss = 0.0
         total_accuracy = 0.0
@@ -295,8 +295,9 @@ class FewShotTrain():
         ### Eval the training before fine-tuning
         if ft_epoch_num == 0 and not Constants["DEACTIVATE_WANDB"]:
             encoder.eval()        
-            test_accs, test_loss, test_outputs, dists = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=X_eval, Y=Y_eval, X_train=X, Y_train=Y,
+            test_accs_std, test_loss, test_outputs, dists = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=X_eval, Y=Y_eval, X_train=X, Y_train=Y,
                                     device=device, model_type=model_type, supp_set=None, classes_per_set=classes_per_set, samples_per_class=samples_per_class, metrics=metrics, finetune=False)
+            test_accs = test_accs_std[0]
             wandb.log({"before_ft_eval_acc": test_accs, "before_ft_eval_loss": test_loss})
 
             # if (exp == "exp3" or exp == "exp6") and model_type == "PrototypicalNetwork":
@@ -383,17 +384,18 @@ class FewShotTrain():
                     # supp_set = {"imgs": X, "labels": Y}
                     # supp_set = {"imgs": self.XSupp, "labels": self.YSupp} 
                     
-                    test_accs, test_loss, test_outputs, dists = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=X_eval, Y=Y_eval, X_train=X, Y_train=Y,
+                    test_accs_std, test_loss, test_outputs, dists = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=X_eval, Y=Y_eval, X_train=X, Y_train=Y,
                                             device=device, model_type=model_type, supp_set=None, classes_per_set=classes_per_set, samples_per_class=samples_per_class, metrics=metrics, finetune=True)
-
+                    test_accs = test_accs_std[0]
                     # Only this distances
-                    # TODO set to == 2
+                    # For all ft_epoch_nums
                     # if ft_epoch_num == 2 and not Constants["DEACTIVATE_WANDB"] and (exp == "exp3" or exp == "exp6") and model_type == "PrototypicalNetwork":
                     if ft_epoch_num == 2 and not Constants["DEACTIVATE_WANDB"] and (exp == "exp3") and model_type == "PrototypicalNetwork":
-                        path_distances = Const_c.get_distances_path(Constants=Constants, sufix_path="_after_3_ft_distances")
-                        if not os.path.exists(os.path.dirname(path_distances)):
+                        path_distances = Const_c.get_distances_path(Constants=Constants, sufix_path="_after_ft_distances", boots_iter=boots_iter)
+                        # if not os.path.exists(os.path.dirname(path_distances)):
+                        if not os.path.exists(path_distances):
                             os.makedirs(os.path.dirname(path_distances), exist_ok=True)
-                            FewShotTrain.calculate_distances(encoder, dists, test_accs, list(Constants["TGT_DATASETS"].keys())[0], model_type, device, batch_size, classes_per_set, samples_per_class)
+                            FewShotTrain.calculate_distances(encoder, dists, test_accs_std, list(Constants["TGT_DATASETS"].keys())[0], model_type, device, batch_size, classes_per_set, samples_per_class, boots_iter=boots_iter)
 
 
                     # print("TEST ACCS", test_accs)
@@ -434,36 +436,43 @@ class FewShotTrain():
 
 
     # Calculate distances from the encoder trained only on few-shot of the other src datasets
-    def calculate_distances(encoder, dists_base, accs_base, ds_name, model_type, device, batch_size, classes_per_set, samples_per_class): 
-        path_distances = Const_c.get_distances_path(Constants=Constants, sufix_path="_after_3_ft_distances")
+    def calculate_distances(encoder, dists_base, accs_base, ds_name, model_type, device, batch_size, classes_per_set, samples_per_class, boots_iter): 
+        path_distances = Const_c.get_distances_path(Constants=Constants, sufix_path="_after_ft_distances", boots_iter=boots_iter)
         os.makedirs(os.path.dirname(path_distances), exist_ok=True)
         FewShotTrain.store_distances(dists_base, accs= accs_base, full_path= path_distances)
         
         all_src_ds = Constants["ALL_SRC_DATASETS"]
 
         for src_ds in all_src_ds:
-            try:
-                if Constants["NUM_SRC_CLASSES_DATASETS"][src_ds] < Constants["LIMIT_N_WAY_TEST"]:
-                    continue
+            # try:
+            if Constants["NUM_SRC_CLASSES_DATASETS"][src_ds] < Constants["LIMIT_N_WAY_TEST"]:
+                continue
+            if src_ds == ds_name:
+                # print("Skipping distances for the same dataset as target:", src_ds)
+                continue
+            if ds_name.startswith("omniglot_SOTA_") and src_ds.startswith("omniglot_SOTA_"):
+                continue
+            if ds_name.startswith("miniImageNet_SOTA_") and src_ds.startswith("miniImageNet_SOTA_"):
+                continue
 
-                ## Load only the training src dataset
-                pretrained_sources = True if Constants["NoSrcDataset"] else pretrained_sources
+            ## Load only the training src dataset
+            pretrained_sources = True if Constants["NoSrcDataset"] else pretrained_sources
 
-                # If no validation src paramenter, Xval is empty
-                data_dict = load_supervised_data(ds_name=ds_name, min_occurence=50, all_datasets=False, pretrained_sources=pretrained_sources, boots_iter=0)
-                
-                
-                XTrain, YTrain = data_dict["X_tgt"], data_dict["Y_tgt"]
+            # If no validation src paramenter, Xval is empty
+            data_dict = load_supervised_data(ds_name=src_ds, min_occurence=50, all_datasets=False, pretrained_sources=pretrained_sources, boots_iter=boots_iter)
+            
+            
+            XTrain, YTrain = data_dict["X_tgt"], data_dict["Y_tgt"]
 
-                encoder.eval()
-                test_accs, test_loss, test_outputs, dists_src = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=torch.from_numpy(XTrain), Y=torch.from_numpy(YTrain), X_train=None, Y_train=None,
-                                        device=device, model_type=model_type, supp_set=None, classes_per_set=classes_per_set, samples_per_class=samples_per_class, metrics={}, finetune=True)
-
-                # Store also accs
-                path_distances_src = Const_c.get_distances_path(Constants=Constants, sufix_path="3_ft_distances_over_" + src_ds + "as_tgt_ds")
-                FewShotTrain.store_distances(dists_src, accs= test_accs, full_path=path_distances_src )
-            except:
-                print("Error calculating distances for dataset:", src_ds)
+            encoder.eval()
+            test_accs_std, test_loss, test_outputs, dists_src = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=torch.from_numpy(XTrain), Y=torch.from_numpy(YTrain), X_train=None, Y_train=None,
+                                    device=device, model_type=model_type, supp_set=None, classes_per_set=classes_per_set, samples_per_class=samples_per_class, metrics={}, finetune=True)
+            test_accs = test_accs_std[0]
+            # Store also accs
+            path_distances_src = Const_c.get_distances_path(Constants=Constants, sufix_path="ft_distances_over_" + src_ds + "as_tgt_ds", boots_iter=boots_iter)
+            FewShotTrain.store_distances(dists_src, accs= test_accs_std, full_path=path_distances_src )
+            # except:
+            #     print("Error calculating distances for dataset:", src_ds)
 
 
     def store_distances(dists, accs, full_path):
@@ -474,7 +483,7 @@ class FewShotTrain():
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             # Save the distances to a file
             np.save(full_path, dists)
-            # Save accs to file
+            # Save accs and std to file
             np.save(full_path.replace(".npy", "_accs.npy"), accs)
             print(f"Distances saved to {full_path}")
 

@@ -125,7 +125,7 @@ class RelationNetwork(nn.Module):
         sample_images = sample_images_.view(-1, sample_images_.shape[2], sample_images_.shape[3], sample_images_.shape[4])
         query_images  = query_images_.view(-1, query_images_.shape[2], query_images_.shape[3], query_images_.shape[4])
 
-        # Obtener features (sin cambios)
+        # Obtain features (no changes)
         sample_features = self.feature_encoder(sample_images.cuda())  # [25,64,5,5]
         sample_features = sample_features.view(batch_size*CLASS_NUM,SAMPLE_NUM_PER_CLASS,FEATURE_DIM,5,5)
         sample_features = torch.sum(sample_features,1).squeeze(1)
@@ -231,11 +231,13 @@ class RelationNetwork(nn.Module):
             sample_labels, query_labels  = sample_labels_[b], query_labels_[b]
             
 
+            breakpoint()
+            
             #### Interp
-            if not self.ds_name.startswith("omniglot"): 
-                if sample_images.shape[3] != 84 and sample_images.shape[3] != 28:
-                    sample_images = F.interpolate(sample_images, size=(84, 84), mode='bilinear', align_corners=False)
-                    query_images = F.interpolate(query_images, size=(84, 84), mode='bilinear', align_corners=False)
+            # if not self.ds_name.startswith("omniglot"): # Not anymore, as the sizes have been forced to 40x40
+            if sample_images.shape[3] != 84 and sample_images.shape[3] != 28:
+                sample_images = F.interpolate(sample_images, size=(84, 84), mode='bilinear', align_corners=False)
+                query_images = F.interpolate(query_images, size=(84, 84), mode='bilinear', align_corners=False)
             
             # 1st net, encoder
             sample_features = self.feature_encoder(sample_images.cuda())   # [CLASS_NUM*SPC, 64, 5, 5]

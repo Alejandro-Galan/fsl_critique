@@ -27,6 +27,10 @@ from network.model import (
 
 from utils import constants
 importlib.reload(constants)
+
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic.main")
+
 from utils.constants import Const_c
 # Initialize reading the json constants file for each experiment
 exp_name = str(sys.argv[1])
@@ -81,13 +85,47 @@ def run_bootstrap(
 
 
     # 3) RUN BOOTSTRAP
+    accumulated_history = pd.DataFrame()
     results = []
     train_best_acc = 0.0
-    for run in range(num_runs):
+
+    path_logs = Const_c.get_logs_csv_path(exp, exp_name, ds_name, Constants)
+    starting_boots_iter = 0
+    reuse_logs = True 
+
+    if exp == "exp3": 
+        path_last_distance = Const_c.get_distances_path(Constants=Constants, sufix_path = "_after_ft_distances", boots_iter=Constants["BOOTSTRAP_ITERS"] - 1)
+        
+        if not os.path.exists(path_last_distance):
+            reuse_logs = False
+
+    ## Check to start from the desired bootstrap iteration only
+    if reuse_logs and os.path.exists(path_logs):
+        df = pd.read_csv(path_logs)
+        df = Const_c.update_filter_search(df, Constants)
+        boots_done = df['bootstrap_iter'].unique()
+        print("Bootstraps done:", boots_done)
+        boots_done = boots_done[~pd.isnull(boots_done)]
+        np.testing.assert_equal(len(boots_done), int(max(boots_done)) + 1 )
+        starting_boots_iter = int(max(boots_done))
+        if accumulated_history.empty:
+            accumulated_history = df.copy()
+
+    for run in range(starting_boots_iter, num_runs):
+
+        run_wandb = wandb.init(
+            project="small-run-matching-networks-SSL-symbols", 
+            group=Constants["GROUP_EXPERIMENT"],
+            tags=list([str(Constants['SAMPLES_PER_CLASS']), str(ds_name), str(Constants['MODEL_TYPE'])]),
+
+            name=str(Constants["Experiment"]) + "_" + str(Constants['SAMPLES_PER_CLASS']) + "_samples_" + str(ds_name) + "_" + str(Constants['MODEL_TYPE']) + "_boots" + str(run) ,
+            config={"batch_size": Constants["BATCH_SIZE"],
+                    "epochs": Constants['EPOCHS']} 
+        )
 
         string_id_base, string_id_ft, src_datasets, src_input_size = Const_c.get_experiment_id(PARAMS=Constants, boots_iter=run, return_extra_params=True)
 
-        if Const_c.all_boots_iter_done(exp, exp_name, ds_name, Constants, boots_iter=run+1, string_id_base=string_id_base):
+        if reuse_logs and Const_c.all_boots_iter_done(exp, exp_name, ds_name, Constants, boots_iter=run+1, string_id_base=string_id_base):
             print("Skipping bootstrap run", run, "already done on logs")
             continue
         
@@ -96,6 +134,7 @@ def run_bootstrap(
         path_weights_base_pretrained = path_weights_base + "_trained_model.pt"
 
         print("Base weights", path_weights_base)
+
 
         wandb.config.update({"src_datasets": src_datasets, "tgt_dataset": ds_name, "samples_per_class": samples_per_class, 
                             "num_total_episodes": Constants["EPISODES"], "batch_size": Constants["BATCH_SIZE"],
@@ -213,14 +252,14 @@ def run_bootstrap(
             print("NUMBER OF N-WAY LOWER THAN 2, makes no sense")
             exit()
             
-        if "exp6" in exp or "exp6" in exp_name:
-            variables = {name: sys.getsizeof(obj) for name, obj in globals().items()}
-            variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
-            print("GLOBALES", variables_ordenadas)
-            variables = {name: sys.getsizeof(obj) for name, obj in locals().items()}
-            variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
-            print("LOCALES", variables_ordenadas)
-            # breakpoint()
+        # if "exp6" in exp or "exp6" in exp_name:
+        #     variables = {name: sys.getsizeof(obj) for name, obj in globals().items()}
+        #     variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
+        #     print("GLOBALES", variables_ordenadas)
+        #     variables = {name: sys.getsizeof(obj) for name, obj in locals().items()}
+        #     variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
+        #     print("LOCALES", variables_ordenadas)
+        #     # breakpoint()
 
         # 3.2) Train and test model
         class_rep, train_best_acc = train_and_test_model(
@@ -239,6 +278,8 @@ def run_bootstrap(
             path_weights_base = path_weights_base,
             X_val=torch.from_numpy(X_val),
             Y_val=torch.from_numpy(Y_val),
+            reuse_logs=reuse_logs,
+            boots_iter=run,
         )
         # NOTE: So far, only accuracy is saved
         if model_type not in Constants['AllowedModels']:
@@ -248,14 +289,43 @@ def run_bootstrap(
 
         results.append(accuracy)
 
-        if "exp6" in exp or "exp6" in exp_name:
-            variables = {name: sys.getsizeof(obj) for name, obj in globals().items()}
-            variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
-            print("GLOBALES", variables_ordenadas)
-            variables = {name: sys.getsizeof(obj) for name, obj in locals().items()}
-            variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
-            print("LOCALES", variables_ordenadas)
-            # breakpoint()
+        # if "exp6" in exp or "exp6" in exp_name:
+        #     variables = {name: sys.getsizeof(obj) for name, obj in globals().items()}
+        #     variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
+        #     print("GLOBALES", variables_ordenadas)
+        #     variables = {name: sys.getsizeof(obj) for name, obj in locals().items()}
+        #     variables_ordenadas = sorted(variables.items(), key=lambda x: x[1], reverse=True)
+        #     print("LOCALES", variables_ordenadas)
+        #     # breakpoint()
+
+        ## Get the history of the run
+        if not Constants["DEACTIVATE_WANDB"]:
+            wandb.join()
+            wandb.finish()
+
+            # if "exp6" in exp:
+            #     breakpoint()
+
+            api = wandb.Api()
+            run_wandb = api.run("grifa/small-run-matching-networks-SSL-symbols/" + run_wandb.id)
+
+            history = run_wandb.history()
+
+            if not 'bootstrap_iter' in history:  
+                print("No bootstrap_iter in history, adding it")
+                continue
+
+            config_wandb = run_wandb.config
+            for key, value in config_wandb.items():
+                history[key] = value
+
+            history['bootstrap_iter'] = history['bootstrap_iter'].ffill()
+
+            # Accumulate history 
+            accumulated_history = pd.concat([accumulated_history, history], ignore_index=True)
+    
+    if not Constants["DEACTIVATE_WANDB"]:
+        return accumulated_history
 
     if results:
         # 4) SAVE RESULTS
@@ -334,6 +404,8 @@ def train_and_test_model(
     path_weights_base="",
     X_val=None, 
     Y_val=None,
+    reuse_logs: bool = True,
+    boots_iter: int = 0,
 ):
     torch.cuda.empty_cache()
     gc.collect()
@@ -439,7 +511,7 @@ def train_and_test_model(
                                         X=torch.from_numpy(XSupp), Y=torch.from_numpy(YSupp), 
                                         device=device, model_type=model_type, samples_per_class=samples_per_class, 
                                         classes_per_set=num_c_ts, optimizer= optimizer, checkpoint_path=path_weights_base,
-                                        X_eval=torch.from_numpy(XTest), Y_eval=torch.from_numpy(YTest), metrics=metrics, ft_epoch_num=epoch )
+                                        X_eval=torch.from_numpy(XTest), Y_eval=torch.from_numpy(YTest), metrics=metrics, ft_epoch_num=epoch, reuse_logs=reuse_logs, boots_iter=boots_iter)
 
             print("BEST TRAIN ACC", best_acc_train, "AFTER FINETUNING", metrics['best_accuracy']) 
 

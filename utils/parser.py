@@ -59,7 +59,8 @@ def parse_files_SOTA(ds_name: str, files_set) -> Tuple[list, list]:
         all_filepaths, all_labels = [], []
         for doc in os.listdir(config.images_dir):
             doc_path = os.path.join(config.images_dir, doc)
-            if ds_name.startswith("miniImageNet") or ds_name.startswith(Const_c.DATASETS.BREAKHIS.value):
+
+            if ds_name.startswith("miniImageNet") or ds_name.startswith(Const_c.DATASETS.BREAKHIS.value) or ds_name.startswith("cifar100"):
                 images, labels = extract_image_label(label_name=doc, char=doc, doc_path=config.images_dir)
                 all_labels += labels
                 all_filepaths += images

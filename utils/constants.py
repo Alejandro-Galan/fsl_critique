@@ -31,21 +31,22 @@ class Const_c():
             params[key] = value
 
 
-
+        # python3 scripts/small_run_matching_networks.py exp6_same_dataset-src_ds_omniglot_SOTA_testSet exp6 MatchingNetwork-4000_E-40x40_I_S/False_FSS omniglot_SOTA_testSet_baseline_over_own_ds-5_NWAY_TRAIN-16_Batch_Size-1_KSpC-0.001_lr-0.0_ValSrc-GROUP_EXP_source_permutation-NWAY-test_5-tgt_ds_omniglot_SOTA_testSet
         # python3 scripts/small_run_matching_networks.py exp6_permuted_src_datasets--src_ds_omniglot_SOTA_testSet exp6 RelationNetwork-4000_E-40x40_I_S/False_FSS-Egyptian-5_NWAY_TRAIN-16_Batch_Size-5_KSpC-0.001_lr-0.0_ValSrc-GROUP_EXP_source_permutation-NWAY-test_5-tgt_ds_b-59-850 
         debug_modifying = False
         if "6" in exp_num:  # or "1" in exp_num: 
-            params['SAMPLES_PER_CLASS'] = 5 #1 #5
-            params['MODEL_TYPE'] = 'PrototypicalNetwork' #'PrototypicalNetwork' #'RelationNetwork'
-            params['DATASETS_NAMES'] =  {Const_c.DATASETS.CAPITAN.value: {}} #{'NO_SRC_DATASET': {}} #{"omniglot_SOTA_trainSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_trainSet": {}}
-            params['TGT_DATASETS']   =  {Const_c.DATASETS.EGYPTIAN.value: {}} #{"omniglot_SOTA_testSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_testSet": {}}
+            params['SAMPLES_PER_CLASS'] = 1 #1 #5
+            params['MODEL_TYPE'] = 'RelationNetwork' #'PrototypicalNetwork' #'RelationNetwork'
+            params['DATASETS_NAMES'] =  {"omniglot_SOTA_trainSet": {}} #{'NO_SRC_DATASET': {}} #{"omniglot_SOTA_trainSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_trainSet": {}}
+            params['TGT_DATASETS']   =  {"omniglot_SOTA_testSet": {}} #{"omniglot_SOTA_testSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_testSet": {}}
             params['OVERWRITE_LOGS'] = False
-            params["EPISODES"] = 100 #2000
-            params["BOOTSTRAP_ITERS"] = 1
-            params["epochsFineTuning"] = 1 #3
+            params["EPISODES"] = 4000 #2000
+            params["BOOTSTRAP_ITERS"] = 5
+            params["epochsFineTuning"] = 3 #3
             params["BATCH_SIZE"] = 16 #16
             params["LIMIT_N_WAY_TRAIN"] = 5
             params["LIMIT_N_WAY_TEST"] = 5
+
             
             # params["ReusePretrained"] = False
             # params["NoSrcDataset"] = True
@@ -194,7 +195,7 @@ class Const_c():
         # exp_name_sufix += "--" + str(5) + "-nwayTrain"
         return "DISTANCES/" + "src_ds_name-" + ds_name + "-" + exp_name_sufix 
 
-    def get_distances_path(Constants, sufix_path):
+    def get_distances_path(Constants, sufix_path, boots_iter):
         # if is type list
         if isinstance(Constants["TGT_DATASETS"], list):
             ds_name = Constants["TGT_DATASETS"][0]
@@ -204,7 +205,7 @@ class Const_c():
             np.testing.assert_equal(len(list(Constants["TGT_DATASETS"].keys())), 1)
 
         dists_path = Const_c.get_dists_path( ds_name, Constants)
-        dists_path += "/" + sufix_path + ".npy"
+        dists_path += "/" + sufix_path + "_bt_" + str(boots_iter) + ".npy"
 
         return dists_path
 
@@ -217,18 +218,37 @@ class Const_c():
         # path_logs = path_logs.replace("___", "_")
         # print(os.path.exists(path_logs))
         
-        path_af = Const_c.get_distances_path(Constants=Constants, sufix_path = "_after_3_ft_distances")
+        # Check just last iteration
+        ft_epoch_num = Constants["epochsFineTuning"] - 1
+        path_af = Const_c.get_distances_path(Constants=Constants, sufix_path = "_after_ft_distances", boots_iter=boots_iter)
 
         if os.path.exists(path_logs):  
             if boots_iter == Constants["BOOTSTRAP_ITERS"]:
                 print("Path logs already exists", path_logs)
+
             df = pd.read_csv(path_logs)
+
+            # Corrupt logs file
+            if 'bootstrap_iter' not in df.columns:
+                # It is also empty
+                np.testing.assert_equal(len(df), 0)
+                print("Corrupted logs file, no bootstrap_iter column", path_logs)
+                Const_c.delete_logs_csv(path_logs)
+                return False
+
             df = Const_c.update_filter_search(df, Constants)
             # Check until that iteration
             for b_it in range(boots_iter):
+                boots_values = df['bootstrap_iter'].unique()
+                boots_values = [int(i) for i in boots_values if not pd.isna(i)]
+                if len(boots_values) == 0 or (len(boots_values) != int(max(boots_values)) + 1):
+                    print(boots_values, "Bootstrap iterations incorrect in logs", boots_iter, "boots iteration")
+                    Const_c.delete_logs_csv(path_logs)
+
                 if not b_it in df['bootstrap_iter'].values:   
                     print("Execution not finished in boots iter", boots_iter, "boots iteration")
-                    Const_c.delete_logs_csv(path_logs)
+                    # Const_c.delete_logs_csv(path_logs)
+                    # Just override the existent one
                     return False
                 df_boots = df[df['bootstrap_iter'] == b_it]
                 if not "before_ft_eval_acc" in df_boots.columns:
@@ -303,21 +323,43 @@ class Const_c():
         DATASETS.TKH.value           : (40,40),
         DATASETS.EGYPTIAN.value      : (40,40),
         DATASETS.GREEK.value         : (40,40),
-        DATASETS.BREAKHIS.value      : (84,84),
         
-        "omniglot"                   : (28,28),
-        "omniglot_SOTA_testSet"      : (28,28),
-        "omniglot_SOTA_trainSet"     : (28,28),
+        "omniglot"                   : (40,40),
+        "omniglot_SOTA_testSet"      : (40,40),
+        "omniglot_SOTA_trainSet"     : (40,40),
 
-        "miniImageNet"               : (84,84),
-        "miniImageNet_SOTA_testSet"  : (84,84),
-        "miniImageNet_SOTA_trainSet" : (84,84),
+        "miniImageNet"               : (40,40),
+        "miniImageNet_SOTA_testSet"  : (40,40),
+        "miniImageNet_SOTA_trainSet" : (40,40),
+        
+        "cifar100_SOTA_trainSet"     : (40,40),
+        "cifar100_SOTA_testSet"      : (40,40),
     }
+
+
+    # BASE_PARAMETERS["INPUT_SIZE"] = {
+    #     DATASETS.CAPITAN.value       : (40,40),
+    #     DATASETS.TKH.value           : (40,40),
+    #     DATASETS.EGYPTIAN.value      : (40,40),
+    #     DATASETS.GREEK.value         : (40,40),
+        
+    #     "omniglot"                   : (28,28),
+    #     "omniglot_SOTA_testSet"      : (28,28),
+    #     "omniglot_SOTA_trainSet"     : (28,28),
+
+    #     "miniImageNet"               : (84,84),
+    #     "miniImageNet_SOTA_testSet"  : (84,84),
+    #     "miniImageNet_SOTA_trainSet" : (84,84),
+        
+    #     "cifar100_SOTA_trainSet"     : (32,32),
+    #     "cifar100_SOTA_testSet"      : (32,32),
+    # }
+        # DATASETS.BREAKHIS.value      : (84,84),
     
 
 
     BASE_PARAMETERS["AllowedModels"] = [ "PrototypicalNetwork", "MatchingNetwork", "RelationNetwork" ]
-    BASE_PARAMETERS["MODEL_TYPE"] = [ "PrototypicalNetwork", "MatchingNetwork"] 
+    BASE_PARAMETERS["MODEL_TYPE"] = [ "PrototypicalNetwork", "MatchingNetwork" ] 
 
     BASE_PARAMETERS["EPOCHS"] = 1 #500 #20 #500 #150
     BASE_PARAMETERS["EPISODES"] = 4000 #1000 #1000 #1000
@@ -358,10 +400,10 @@ class Const_c():
 
 
     BASE_PARAMETERS["SOTA_DATASETS"] = ["omniglot", "miniImageNet", "omniglot_SOTA_testSet", "miniImageNet_SOTA_testSet",
-                    "omniglot_SOTA_trainSet", "miniImageNet_SOTA_trainSet", "BreaKHis_formatted"]
+                    "omniglot_SOTA_trainSet", "miniImageNet_SOTA_trainSet", "cifar100_SOTA_trainSet", "cifar100_SOTA_testSet"] #, "BreaKHis_formatted"]
                     
-    BASE_PARAMETERS["ALL_SRC_DATASETS"] = ["TKH", "b-59-850", "Egyptian", "Greek", "omniglot_SOTA_trainSet", "miniImageNet_SOTA_trainSet", "BreaKHis_formatted"]
-    BASE_PARAMETERS["NUM_SRC_CLASSES_DATASETS"] = {"TKH":347, "b-59-850":28, "Egyptian":18, "Greek":112, "omniglot_SOTA_trainSet":1623, "miniImageNet_SOTA_trainSet":100, "BreaKHis_formatted":8}
+    BASE_PARAMETERS["ALL_SRC_DATASETS"] = ["TKH", "b-59-850", "Egyptian", "Greek", "omniglot_SOTA_trainSet", "miniImageNet_SOTA_trainSet"] #, "BreaKHis_formatted"]
+    BASE_PARAMETERS["NUM_SRC_CLASSES_DATASETS"] = {"TKH":347, "b-59-850":28, "Egyptian":18, "Greek":112, "omniglot_SOTA_trainSet":1623, "miniImageNet_SOTA_trainSet":100} #, "BreaKHis_formatted":8}
 
 
     if not BASE_PARAMETERS["FineTuning"]:

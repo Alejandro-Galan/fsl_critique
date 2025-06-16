@@ -2,8 +2,9 @@
     "NWAY": {
         "1": 5,
         "3": 5,
-        "4": 5,
-        "10": 5
+        "4": 20,
+        "10": 5,
+        "6": 5
     },
     "SPC_OW": {
         "1": [
@@ -13,23 +14,27 @@
             1,5
         ],
         "4": [
-            5
+            1, 5
         ],
         "10": [
-            5
-        ]
+            1, 5
+        ],
+        "6": [ 1 ]
     },
     "MODEL_TS": {
         "1": [
-            "MatchingNetwork", "PrototypicalNetwork"
+            "RelationNetwork"
         ],
         "3": [
             "MatchingNetwork", "PrototypicalNetwork"
         ],
         "4": [
-            "PrototypicalNetwork"
+             "PrototypicalNetwork", "MatchingNetwork"
         ],
         "10": [
+            "PrototypicalNetwork"
+        ],
+        "6": [
             "PrototypicalNetwork"
         ]
     }

@@ -27,22 +27,28 @@ def extract_metadata_from_file(full_path):
     match = re.match(pattern, dir_name)
 
     if match:
-        src_ds_name = match.group("src_ds_name")
+        trained_ds = match.group("src_ds_name")
         spc = int(match.group("spc"))
         model = match.group("model")
         nway = int(match.group("nway"))
-        print(f"src_ds_name: {src_ds_name}, spc: {spc}, model: {model}, nway: {nway}")
+        # print(f"trained_ds: {trained_ds}, spc: {spc}, model: {model}, nway: {nway}")
     else:
         print("Formato no reconocido.", full_path)    
         breakpoint()
-    
-    if "3_ft_distances_over" in full_path:
-        tgt_ds = full_path.split("3_ft_distances_over_")[1].replace("as_tgt_ds.npy", "")
-        tgt_ds = tgt_ds.replace("_accs.npy", "")
+    if "ft_distances_over" in full_path:
+        unseen_ds = full_path.split("ft_distances_over_")[1].split("as_tgt_ds_")[0]
+        unseen_ds = unseen_ds.replace("_accs.npy", "")
+        domain = "OOD" 
     else:
-        tgt_ds = src_ds_name
+        unseen_ds = trained_ds
+        if trained_ds.startswith("omniglot_SOTA"):
+            unseen_ds = "omniglot_SOTA_trainSet"
+        elif trained_ds.startswith("miniImageNet_SOTA"):
+            unseen_ds = "miniImageNet_SOTA_trainSet"
+        
+        domain = "ID" 
 
-    metadata = {"src_ds_name": src_ds_name, "spc": spc, "model": model, "nway": nway, "tgt_ds": tgt_ds}
+    metadata = {"trained_ds": trained_ds, "spc": spc, "model": model, "nway": nway, "unseen_ds": unseen_ds, "domain": domain}
 
     return metadata
 
@@ -50,16 +56,17 @@ def extract_metadata_from_file(full_path):
 def quartile_ratio(ordered_dists, normalize):
     values = ordered_dists.reshape(-1, ordered_dists.shape[2])
     
-    ratios = []
+    ratios_sum, ratios_limits = [], []
     for i, query_s in enumerate(values):
         # freq, bins = np.histogram(query_s, bins=50)
 
         max_values = np.sum(query_s)
         if normalize:
             query_s = query_s / max_values
-        if i == 1:
-            print(i, "unnorm_s:", query_s * max_values)
-            print(i, "query_s:", query_s)
+        
+        # if i == 1:
+        #     print(i, "unnorm_s:", query_s * max_values)
+        #     print(i, "query_s:", query_s)
 
 
         q1 = np.percentile(query_s, 25)
@@ -75,11 +82,15 @@ def quartile_ratio(ordered_dists, normalize):
         q2_values = np.sum(query_s[query_s > q1])
         q1_values = np.sum(query_s[query_s <= q1])
         
-        ratio = (q2_values + q1_values) / (q4_values + q3_values)
-        if i == 1:
-            print("ratio:", ratio, "qs:", q1, q2, q3, q4)
-        ratios.append(ratio)
-    return np.mean(ratios)
+        ratio_sum = (q2_values + q1_values) / (q4_values + q3_values)
+        ratio_lim = (q2 + q1) / (q4 + q3)
+        
+        # if i == 1:
+        #     print("ratio_sum:", ratio_sum, "ration_lim:", ratio_lim, "qs:", q1, q2, q3, q4)
+        
+        ratios_sum.append(ratio_sum)
+        ratios_limits.append(ratio_lim)
+    return np.mean(ratios_sum), np.mean(ratios_limits)
 
 def calculate_metrics(af_distances, af_accs, base_dists):
     # Calculate the mean difference
@@ -91,55 +102,116 @@ def calculate_metrics(af_distances, af_accs, base_dists):
     ordered_dists = np.sort(perm_dists, axis=2)
 
     # ratio      = quartile_ratio(ordered_dists, normalize=False)
-    norm_ratio = quartile_ratio(ordered_dists, normalize=True)
-
+    norm_ratio_sum, norm_ratio_limits = quartile_ratio(ordered_dists, normalize=True)
+    
     # Calculate the accuracy
     acc = np.mean(af_accs)
     
-    return {"mean_diff": mean_diff, "norm_ratio": norm_ratio, "acc": acc}
+    return {"mean_diff": mean_diff, "norm_ratio_sum": norm_ratio_sum, "norm_ratio_limits": norm_ratio_limits, "acc": acc}
 
+def bt_suffix(bt_epoch):
+    return  "_bt_" + str(bt_epoch)
 
-af_sufix = "_after_3_ft_distances.npy"
+af_sufix = "_after_ft_distances"
 
 df = pd.DataFrame()
 for folder in folders:
 
     folder_path = os.path.join(root, folder)
     if os.path.isdir(folder_path):
+        print("Processing folder:", folder)
         files = os.listdir(folder_path)
         metadatas = {}
+        boots_iters = []
         for file in files:
             file_path = os.path.join(folder_path, file)
             metadata = extract_metadata_from_file(file_path)
+            if file.endswith("accs.npy"):
+                # Skip accuracy files
+                continue
+            if file.startswith("3_ft_distances") or file.startswith("_after_3_ft_distances"):
+                # Remove file
+                print("Removing old file:", file_path)
+                os.remove(file_path)
+                continue
+            
+            metadata["bt_iter"] = int(file_path.split("bt_")[-1].split(".npy")[0])
+            if metadata["bt_iter"] not in boots_iters:
+                boots_iters.append(metadata["bt_iter"])
+
             if file.startswith(af_sufix):
+                # print(file_path)
+                af_distances, af_accs = read_file(file_path)      
+                metadatas["base" + bt_suffix(metadata["bt_iter"])] = metadata
+            elif file.startswith("ft_distances_over"):
                 af_distances, af_accs = read_file(file_path)            
-                metadatas["base"] = metadata
-            elif file.startswith("3_ft_distances_over") and not file.endswith("accs.npy"):
-                af_distances, af_accs = read_file(file_path)            
-                metadatas[metadata['tgt_ds']] = metadata
+                metadatas[metadata['unseen_ds'] + bt_suffix(metadata["bt_iter"])] = metadata
             else:
+                # print("Skipping file:", file_path)
                 continue
             metadata["af_distances"] = af_distances
             metadata["af_accs"] = af_accs
 
-        base_dists = metadatas["base"]["af_distances"]
+        if "base_bt_0" not in metadatas:
+            print("Empty folder:", folder_path)
+            try:
+                os.rmdir(folder_path)  
+            except:
+                print("Could not remove folder:", folder_path)
+            continue 
+        
+        for bt_ep in boots_iters:
+            
+            # filter metadata with elements finishing with bt_epoch only 
+            bt_suffix_str = bt_suffix(bt_ep)
+            metadatas_ft = {k: v for k, v in metadatas.items() if k.endswith(bt_suffix_str)}
 
-        for name, met in metadatas.items():
-            print("src_ds_name:", met["src_ds_name"], "tgt_ds:", name, "spc:", met["spc"], "nway:", met["nway"])
-            metrics = calculate_metrics(met["af_distances"], met["af_accs"], base_dists)
-            # Add new row to the DataFrame
-            new_row = {
-                "src_ds_name": met["src_ds_name"],
-                "spc": met["spc"],
-                "model": met["model"],
-                "nway": met["nway"],
-                "tgt_ds": met["tgt_ds"],
-                "mean_diff": metrics["mean_diff"],
-                "acc": met["af_accs"],
-                "dis_mean": np.mean(met["af_distances"]),
-                "norm_ratio": metrics["norm_ratio"],
-            }
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            base_dists = metadatas_ft["base" + bt_suffix(bt_ep)]["af_distances"]
+
+            # for name, met in metadatas_ft.items():
+            for name, met in metadatas_ft.items():
+                
+                # # Forbidden cases
+                # if met["trained_ds"] == "omniglot_SOTA_trainvalSet" or met["trained_ds"] == "omniglot_SOTA_trainSet" or met["trained_ds"] == "miniImageNet_SOTA_trainSet":
+                #     continue
+
+                # if met["unseen_ds"] == "omniglot_SOTA_testSet":
+                #     continue
+
+
+                print("trained_ds:", met["trained_ds"], "unseen_ds:", name, "\n\tspc:", met["spc"], "nway:", met["nway"])
+                metrics = calculate_metrics(met["af_distances"], met["af_accs"], base_dists)
+                
+                # Add new row to the DataFrame
+                new_row = {
+                    "unseen_ds": met["unseen_ds"],
+                    "spc": met["spc"],
+                    "model": met["model"],
+                    "nway": met["nway"],
+                    "trained_ds": met["trained_ds"],
+                    "mean_diff": metrics["mean_diff"],
+                    "acc": met["af_accs"][0],
+                    "dis_mean": np.mean(met["af_distances"]),
+                    "norm_ratio_sum": metrics["norm_ratio_sum"],
+                    "norm_ratio_limits": metrics["norm_ratio_limits"],
+                    "domain": met["domain"],
+                    "acc_std": met["af_accs"][1],
+                    "bt_iter": met["bt_iter"]
+
+                }
+
+                # new_row = {
+                #     "unseen_ds": met["unseen_ds"],
+                #     "spc": met["spc"],
+                #     "model": met["model"],
+                #     "nway": met["nway"],
+                #     "trained_ds": met["trained_ds"],
+                #     "acc": met["af_accs"][0],
+                #     "domain": met["domain"],
+
+                # }
+                
+                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
 # Save the DataFrame to a CSV file
 df.to_csv("distances_analysis.csv", index=False)

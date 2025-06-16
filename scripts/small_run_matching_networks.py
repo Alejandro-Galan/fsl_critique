@@ -61,17 +61,21 @@ def run_approach_experiments(exp_name: str = "", group_exp_name: str = ""):
                     # else:
                     #     print("Weights not found")
 
-            run = wandb.init(
-                project="small-run-matching-networks-SSL-symbols", 
-                group=Constants["GROUP_EXPERIMENT"],
-                tags=[str(Constants['SAMPLES_PER_CLASS']), ds_name, Constants['MODEL_TYPE']],
 
-                name=Constants["Experiment"] + "_" + str(Constants['SAMPLES_PER_CLASS']) + "_samples_" + ds_name + "_" + Constants['MODEL_TYPE'],
-                config={"batch_size": Constants["BATCH_SIZE"],
-                        "epochs": Constants['EPOCHS']} 
-            )
+            # if "exp6" in exp:
+            #     breakpoint()
+            ### May be best to run it for each run_bootstrap
+            # run = wandb.init(
+            #     project="small-run-matching-networks-SSL-symbols", 
+            #     group=Constants["GROUP_EXPERIMENT"],
+            #     tags=[str(Constants['SAMPLES_PER_CLASS']), ds_name, Constants['MODEL_TYPE']],
 
-        train(
+            #     name=Constants["Experiment"] + "_" + str(Constants['SAMPLES_PER_CLASS']) + "_samples_" + ds_name + "_" + Constants['MODEL_TYPE'],
+            #     config={"batch_size": Constants["BATCH_SIZE"],
+            #             "epochs": Constants['EPOCHS']} 
+            # )
+
+        accumulated_history = train(
             ds_name=ds_name,
             samples_per_class=Constants['SAMPLES_PER_CLASS'],
             model_type=Constants['MODEL_TYPE'],
@@ -81,39 +85,29 @@ def run_approach_experiments(exp_name: str = "", group_exp_name: str = ""):
             num_runs=Constants["BOOTSTRAP_ITERS"],
         )
 
-        if not Constants["DEACTIVATE_WANDB"]: 
-            wandb.finish()
-            api = wandb.Api()
-            run = api.run("grifa/small-run-matching-networks-SSL-symbols/" + run.id)
-
-            history = run.history()  
-            print("History to", history['bootstrap_iter'])
-            
-            if not 'bootstrap_iter' in history: # The whole iteration could not have existed
-                print("No bootstrap_iter in history, adding it")
-                continue
-            config = run.config
-            for key, value in config.items():
-                history[key] = value
-            # It was only on the first one
+        if not Constants["DEACTIVATE_WANDB"]:
             
             ## In case of missing bootstrap_iters
-            size_offset = math.ceil(len(history['bootstrap_iter']) / Constants["BOOTSTRAP_ITERS"])
+            # size_offset = math.ceil(len(accumulated_history['bootstrap_iter']) / Constants["BOOTSTRAP_ITERS"])
 
-            last_real_value = float('nan')
-            for i, val in enumerate(history['bootstrap_iter']):
-                if pd.isna(val):
-                    if pd.isna(last_real_value):
-                        history['bootstrap_iter'][i] = i // size_offset
-                    else:
-                        history['bootstrap_iter'][i] = last_real_value
-                else:
-                    last_real_value = val
+            # last_real_value = float('nan')
+            # # Order hystory by _step
+            # copy_boots_iter = accumulated_history['bootstrap_iter'].copy()
+            # for i, val in enumerate(accumulated_history['bootstrap_iter']):
+            #     if pd.isna(val):
+            #         if pd.isna(last_real_value):
+            #             copy_boots_iter[i] = i // size_offset
+            #         else:
+            #             copy_boots_iter[i] = last_real_value
+            #     else:
+            #         last_real_value = val
+            # accumulated_history['bootstrap_iter'] = copy_boots_iter
+            
             # history['bootstrap_iter'] = [
             #     i // size_offset if pd.isna(val) else val
             #     for i, val in enumerate(history['bootstrap_iter'])
             # ]
-            print("AFTER History to", history['bootstrap_iter'])
+            # print("AFTER History to", history['bootstrap_iter'])
 
             
 
@@ -122,13 +116,13 @@ def run_approach_experiments(exp_name: str = "", group_exp_name: str = ""):
 
 
             
-            history['exp_name'] = exp_name.split("--")[0]
+            accumulated_history['exp_name'] = exp_name.split("--")[0]
             new_columns = {"tgt_dataset": ds_name, "samples_per_class": Constants['SAMPLES_PER_CLASS'], "model_type": Constants['MODEL_TYPE'],
                             "src_datasets": "__".join(Constants["DATASETS_NAMES"])}
             for key, value in new_columns.items():
-                history[key] = value
+                accumulated_history[key] = value
 
-            history.to_csv(full_name, index=False)
+            accumulated_history.to_csv(full_name, index=False)
             # history.to_csv("logs_csv/last_exec/" + exp_name + exp_name_sufix + "__" + timestamp + "_.csv", index=False)
 
     

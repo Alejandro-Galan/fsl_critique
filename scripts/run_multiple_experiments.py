@@ -61,15 +61,17 @@ def filter_n_way_datasets(allMoreParams, source_datasets, target_datasets):
             to_cluster_kmeans = True
     for moreParams in allMoreParams:
         if "LIMIT_N_WAY_TRAIN" in moreParams and moreParams["LIMIT_N_WAY_TRAIN"] > 18:
-            banned = [Const_c.DATASETS.EGYPTIAN.value, "miniImageNet_SOTA_trainSet", Const_c.DATASETS.BREAKHIS.value]
+            banned = [Const_c.DATASETS.EGYPTIAN.value, "miniImageNet_SOTA_trainSet", 
+                      Const_c.DATASETS.BREAKHIS.value, "cifar100_SOTA_trainSet"]
             if to_cluster_kmeans:
-                banned = ["miniImageNet_SOTA_trainSet"]
+                banned = ["miniImageNet_SOTA_trainSet", "cifar100_SOTA_trainSet"]
             for b in banned:
                 if b in source_datasets:
                     source_datasets.remove(b)
         if "LIMIT_N_WAY_TEST" in moreParams and moreParams["LIMIT_N_WAY_TEST"] > 18:
             banned = [Const_c.DATASETS.CAPITAN.value, Const_c.DATASETS.EGYPTIAN.value, 
-                    "miniImageNet_SOTA_testSet", Const_c.DATASETS.BREAKHIS.value]
+                    "miniImageNet_SOTA_testSet", Const_c.DATASETS.BREAKHIS.value,
+                    "cifar100_SOTA_testSet"]
             for b in banned:
                 if b in target_datasets:
                     target_datasets.remove(b)
@@ -78,9 +80,10 @@ def filter_n_way_datasets(allMoreParams, source_datasets, target_datasets):
         if "SAMPLES_PER_CLASS" in moreParams and 10 in moreParams["SAMPLES_PER_CLASS"]:
             if len(moreParams["SAMPLES_PER_CLASS"]) > 1:
                 print("WARNING: Removing some datasets because 10 spc is in the list")
-            banned = ["omniglot_SOTA_trainvalSet", "omniglot_SOTA_testSet",
+            banned = ["omniglot_SOTA_trainSet", "omniglot_SOTA_testSet",
                       "miniImageNet_SOTA_trainSet", "miniImageNet_SOTA_testSet", 
-                      Const_c.DATASETS.BREAKHIS.value]
+                      Const_c.DATASETS.BREAKHIS.value, 
+                      "cifar100_SOTA_trainSet", "cifar100_SOTA_testSet"]
             for b in banned:
                 if b in source_datasets:
                     source_datasets.remove(b)
@@ -172,14 +175,13 @@ def exp1_2_5_run_source_permutation_experiments(moreParams=[], exp_name="", grou
 
 
     source_datasets = [Const_c.DATASETS.CAPITAN.value, Const_c.DATASETS.EGYPTIAN.value, Const_c.DATASETS.TKH.value, Const_c.DATASETS.GREEK.value, 
-                        "omniglot_SOTA_trainvalSet","miniImageNet_SOTA_trainSet", Const_c.DATASETS.BREAKHIS.value]
+                        "omniglot_SOTA_trainSet","miniImageNet_SOTA_trainSet", "cifar100_SOTA_trainSet"] #, Const_c.DATASETS.BREAKHIS.value]
 
-    
-    
+
     target_datasets = [Const_c.DATASETS.CAPITAN.value, Const_c.DATASETS.EGYPTIAN.value, Const_c.DATASETS.TKH.value, Const_c.DATASETS.GREEK.value, 
-                        "omniglot_SOTA_testSet","miniImageNet_SOTA_testSet", Const_c.DATASETS.BREAKHIS.value]
+                        "omniglot_SOTA_testSet","miniImageNet_SOTA_testSet", "cifar100_SOTA_testSet"] #, Const_c.DATASETS.BREAKHIS.value]
 
-    
+
 
     #################################################
     ## DEBUG ##
@@ -188,7 +190,7 @@ def exp1_2_5_run_source_permutation_experiments(moreParams=[], exp_name="", grou
     # if True:
     #     source_datasets = [Const_c.DATASETS.GREEK.value, Const_c.DATASETS.EGYPTIAN.value]
 
-    #     target_datasets = [Const_c.DATASETS.TKH.value, "omniglot_SOTA_trainvalSet"]
+    #     target_datasets = [Const_c.DATASETS.TKH.value, "omniglot_SOTA_trainSet"]
     #################################################
 
 
@@ -197,7 +199,7 @@ def exp1_2_5_run_source_permutation_experiments(moreParams=[], exp_name="", grou
     # Egypt and BreaKHis are too small to have validation
     if group_exp_name == "exp2":
         source_datasets = [Const_c.DATASETS.CAPITAN.value, Const_c.DATASETS.TKH.value, Const_c.DATASETS.GREEK.value, 
-                            "omniglot_SOTA_trainvalSet","miniImageNet_SOTA_trainSet"]
+                            "omniglot_SOTA_trainSet","miniImageNet_SOTA_trainSet"]
 
         target_datasets = [Const_c.DATASETS.CAPITAN.value, Const_c.DATASETS.TKH.value, Const_c.DATASETS.GREEK.value, 
                             "omniglot_SOTA_testSet","miniImageNet_SOTA_testSet"]
@@ -254,8 +256,8 @@ def exp3_4__run_source_permutation_experiments(moreParams=[], exp_name="", group
     os.makedirs(path_exp, exist_ok=True)
 
 
-    target_datasets = [Const_c.DATASETS.CAPITAN.value, Const_c.DATASETS.EGYPTIAN.value, Const_c.DATASETS.TKH.value, Const_c.DATASETS.GREEK.value, 
-                    Const_c.DATASETS.BREAKHIS.value, "omniglot_SOTA_testSet", "miniImageNet_SOTA_testSet"]
+    target_datasets = ["omniglot_SOTA_testSet", Const_c.DATASETS.CAPITAN.value, Const_c.DATASETS.EGYPTIAN.value, Const_c.DATASETS.TKH.value, Const_c.DATASETS.GREEK.value, 
+                       "miniImageNet_SOTA_testSet", "cifar100_SOTA_testSet"] # Const_c.DATASETS.BREAKHIS.value,
 
 
     source_datasets, target_datasets = filter_n_way_datasets(moreParams, {}, target_datasets)
@@ -294,7 +296,7 @@ def exp3_4__run_source_permutation_experiments(moreParams=[], exp_name="", group
             if tgt_dataset == "miniImageNet_SOTA_testSet":
                 sub_params["DATASETS_NAMES"] = {"miniImageNet_SOTA_trainSet":{}}
             if tgt_dataset == "omniglot_SOTA_testSet":
-                sub_params["DATASETS_NAMES"] = {"omniglot_SOTA_trainvalSet":{}}
+                sub_params["DATASETS_NAMES"] = {"omniglot_SOTA_trainSet":{}}
         
         ################# DEBUG ##################
         # sub_params = debug_FAST_CONFIG(sub_params)
@@ -341,6 +343,7 @@ NWAY = basic_params["NWAY"][exp_num]
 # ### Some datasets banned if 10 in SPC_OW
 # SPC_OW  = [1, 5] #[10] #[1, 5]
 SPC_OW = basic_params["SPC_OW"][exp_num] 
+BOOTSTRAP_ITERS = 1
 
 # MODEL_TS = ["PrototypicalNetwork"] #["RelationNetwork"] # ["PrototypicalNetwork", "MatchingNetwork"]
 MODEL_TS = basic_params["MODEL_TS"][exp_num] 
@@ -349,27 +352,28 @@ if __name__ == "__main__":
     if exp_num == "1":
         ## Exp 1. permutation src datasets
         print("Running experiment 1: Permuted source datasets w/o validation")
-        # use_validation_params = [{"BOOTSTRAP_ITERS": 5}, {"epochsFineTuning": 3}, {"ReusePretrained": False} ]
-        use_validation_params = [{"BOOTSTRAP_ITERS": 5}, {"epochsFineTuning": 3}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS} ]
+        # use_validation_params = [{"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"epochsFineTuning": 3}, {"ReusePretrained": False} ]
+        use_validation_params = [{"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"epochsFineTuning": 3}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS} ]
         exp1_2_5_run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp1_permuted_src_datasets", group_exp_name="exp1")
     
     if exp_num == "2":
         ## Exp 2. permutation src datasets with validation
         print("Running experiment 2: Permuted source datasets with validation")
-        use_validation_params = [{"VALIDATION_SRC_SRC_DATA": True}, {"VALIDATION_PERC": 0.2}, {"BOOTSTRAP_ITERS": 5}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS}]
+        use_validation_params = [{"VALIDATION_SRC_SRC_DATA": True}, {"VALIDATION_PERC": 0.2}, {"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS}]
         exp1_2_5_run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp2_permuted_src_datasets_WithValidation", group_exp_name="exp2")
 
     if exp_num == "3":
         ## Exp 3. No source training  only Fine tuning with validation
         print("Running experiment 3: No source training only ft")
-        use_validation_params = [{"NoSrcDataset": True}, {"epochsFineTuning": 5}, {"BOOTSTRAP_ITERS": 5}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS}]
+        BOOTSTRAP_ITERS = 10
+        use_validation_params = [{"NoSrcDataset": True}, {"epochsFineTuning": 3}, {"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS}]
         exp3_4__run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp3_no_src_datasets", group_exp_name="exp3")
 
     if exp_num == "4":
         ## Exp 4. Division of classes among the same dataset with validation
         print("Running experiment 4: All training over the same dataset")
         # {"VALIDATION_SRC_SRC_DATA": True}, , {"VALIDATION_PERC": 0.2}, # Seems to work better without
-        use_validation_params = [{"ALL_DATASETS": False}, {"BOOTSTRAP_ITERS": 5}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS}]
+        use_validation_params = [{"ALL_DATASETS": False}, {"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS}]
         # use_validation_params = [{"ALL_DATASETS": False}, {"BOOTSTRAP_ITERS": 1}, {"epochsFineTuning": 1}, ]
         exp3_4__run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp4_same_dataset", group_exp_name="exp4")
 
@@ -384,13 +388,13 @@ if __name__ == "__main__":
 
         ## Exp 1. Proposal
         # print("Running experiment 1.5 nosrc")
-        # use_validation_params = [{"NoSrcDataset": True}, {"BOOTSTRAP_ITERS": 5}, {"epochsFineTuning": 1}  ]
+        # use_validation_params = [{"NoSrcDataset": True}, {"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"epochsFineTuning": 1}  ]
         # exp1_2_5_run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp5_premute_datasets", group_exp_name="exp5")
 
 
         ## Exp3. Random weights
         # print("Running experiment 3.5 baseline with repetition to compare: All training over the same dataset")
-        # use_validation_params = [{"ALL_DATASETS": False}, {"BOOTSTRAP_ITERS": 5},  {"epochsFineTuning": 1} ]
+        # use_validation_params = [{"ALL_DATASETS": False}, {"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS},  {"epochsFineTuning": 1} ]
         # exp3_4__run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp5_noInit", group_exp_name="exp5")
 
         # ## Exp 5. Change of Hyperparametesrs    
@@ -404,15 +408,15 @@ if __name__ == "__main__":
     if exp_num == "6":
         ## Exp 6.     
         print("Running experiment 6: DEBUG")
-        # exp1_2_5_run_source_permutation_experiments(exp_name="exp6_DEBUG", group_exp_name="exp6")
+        exp1_2_5_run_source_permutation_experiments(exp_name="exp6_DEBUG", group_exp_name="exp6")
 
-        m_ = 22
+        # m_ = 22
         ## Debug for Exp 9. Clustering permutation src datasets
-        print("Running experiment 9: Permuted source datasets w/o validation") # {"CLUSTERING": "KMEANS"}, {"M-labels-SRC": m_},
-        use_validation_params = [{"BOOTSTRAP_ITERS": 5}, {"epochsFineTuning": 3}, {"epochsFineTuning": 3}, {"CLUSTERING": "CONSTRAINED-KMEANS"}, {"M-labels-SRC": m_},
-                                {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS} ]
+        # print("Running experiment 9: Permuted source datasets w/o validation") # {"CLUSTERING": "KMEANS"}, {"M-labels-SRC": m_},
+        # use_validation_params = [{"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"epochsFineTuning": 3}, {"epochsFineTuning": 3}, {"CLUSTERING": "CONSTRAINED-KMEANS"}, {"M-labels-SRC": m_},
+        #                         {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS} ]
         # exp1_2_5_run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp6_cluster_kmeans_m_" + str(m_), group_exp_name="exp6")
-        exp1_2_5_run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp6_like1", group_exp_name="exp6")
+        # exp1_2_5_run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp6_like1", group_exp_name="exp6")
 
 
     if exp_num == "7":
@@ -422,7 +426,7 @@ if __name__ == "__main__":
         # use_validation_params = [{"ALL_DATASETS": False}, {"FINE_TUNING_EPISODES": 16}, 
         #                          {"epochsFineTuning" : 187} ] # Original / batch size as a minimum
         use_validation_params = [{"ALL_DATASETS": False}, {"FINE_TUNING_EPISODES": 16}, 
-                                 {"epochsFineTuning" : 25}, {"BOOTSTRAP_ITERS": 5}, {"MODEL_TYPE": MODEL_TS} ] # Original / batch size as a minimum
+                                 {"epochsFineTuning" : 25}, {"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"MODEL_TYPE": MODEL_TS} ] # Original / batch size as a minimum
         
 
         exp3_4__run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp7s_FT", group_exp_name="exp7")
@@ -441,7 +445,7 @@ if __name__ == "__main__":
     if exp_num == "9":
         ## Exp 9. Clustering permutation src datasets
         print("Running experiment 9: Permuted source datasets w/o validation")
-        use_validation_params = [{"BOOTSTRAP_ITERS": 5}, {"epochsFineTuning": 3}, {"CLUSTERING": "KMEANS"}, {"M-labels-SRC": -1}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS} ]
+        use_validation_params = [{"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"epochsFineTuning": 3}, {"CLUSTERING": "KMEANS"}, {"M-labels-SRC": -1}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS} ]
         exp1_2_5_run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp9_cluster_kmeans_m_eq_n", group_exp_name="exp9")
 
         if NWAY == 5:
@@ -452,7 +456,7 @@ if __name__ == "__main__":
         for m_ in new_m:
             ## Exp 9. Clustering permutation src datasets
             print("Running experiment 9: Permuted source datasets w/o validation")
-            use_validation_params = [{"BOOTSTRAP_ITERS": 5}, {"epochsFineTuning": 3}, {"CLUSTERING": "KMEANS"}, {"M-labels-SRC": m_}, 
+            use_validation_params = [{"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"epochsFineTuning": 3}, {"CLUSTERING": "KMEANS"}, {"M-labels-SRC": m_}, 
                                     {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS} ]
             exp1_2_5_run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp9_cluster_kmeans_m_" + str(m_), group_exp_name="exp9")
 
@@ -460,7 +464,7 @@ if __name__ == "__main__":
     if exp_num == "10":
         ## Exp 10. Clustering permutation src datasets
         print("Running experiment 9: Permuted source datasets w/o validation")
-        use_validation_params = [{"BOOTSTRAP_ITERS": 5}, {"epochsFineTuning": 3}, {"CLUSTERING": "CONSTRAINED-KMEANS"}, {"M-labels-SRC": -1}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS} ]
+        use_validation_params = [{"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"epochsFineTuning": 3}, {"CLUSTERING": "CONSTRAINED-KMEANS"}, {"M-labels-SRC": -1}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS} ]
         exp1_2_5_run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp9_cluster_constr_kmeans_m_eq_n", group_exp_name="exp10")
 
         if NWAY == 5:
@@ -471,7 +475,7 @@ if __name__ == "__main__":
         for m_ in new_m:
             ## Exp 9. Clustering permutation src datasets
             print("Running experiment 9: Permuted source datasets w/o validation")
-            use_validation_params = [{"BOOTSTRAP_ITERS": 5}, {"epochsFineTuning": 3}, {"CLUSTERING": "CONSTRAINED-KMEANS"}, {"M-labels-SRC": m_}, 
+            use_validation_params = [{"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"epochsFineTuning": 3}, {"CLUSTERING": "CONSTRAINED-KMEANS"}, {"M-labels-SRC": m_}, 
                                     {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS} ]
             exp1_2_5_run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp9_cluster_constr_kmeans_m_" + str(m_), group_exp_name="exp10")
 
@@ -481,13 +485,13 @@ if __name__ == "__main__":
 
         ## Set of exp1:
         MODEL_TS = ["PrototypicalNetwork", "MatchingNetwork"] #["RelationNetwork"] # ["PrototypicalNetwork", "MatchingNetwork"]
-        exc_pars = [ {"DATASETS_NAMES": "omniglot_SOTA_trainvalSet", "TGT_DATASETS": {Const_c.DATASETS.GREEK.value:{}}, "nway": 20, "spc": [5]},
-                     {"DATASETS_NAMES": "omniglot_SOTA_trainvalSet", "TGT_DATASETS": {Const_c.DATASETS.GREEK.value:{}}, "nway": 20, "spc": [10]},
+        exc_pars = [ {"DATASETS_NAMES": "omniglot_SOTA_trainSet", "TGT_DATASETS": {Const_c.DATASETS.GREEK.value:{}}, "nway": 20, "spc": [5]},
+                     {"DATASETS_NAMES": "omniglot_SOTA_trainSet", "TGT_DATASETS": {Const_c.DATASETS.GREEK.value:{}}, "nway": 20, "spc": [10]},
                      ]
 
         for pars in exc_pars: 
             print("Running experiment 1: Permuted source datasets w/o validation")
-            # use_validation_params = [{"BOOTSTRAP_ITERS": 5}, {"epochsFineTuning": 3}, {"ReusePretrained": False} ]
-            use_validation_params = [{"BOOTSTRAP_ITERS": 5}, {"epochsFineTuning": 3}, {"LIMIT_N_WAY_TRAIN": pars["nway"]}, {"LIMIT_N_WAY_TEST": pars["nway"]}, {"SAMPLES_PER_CLASS": pars["spc"]}, {"MODEL_TYPE": MODEL_TS},
+            # use_validation_params = [{"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"epochsFineTuning": 3}, {"ReusePretrained": False} ]
+            use_validation_params = [{"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"epochsFineTuning": 3}, {"LIMIT_N_WAY_TRAIN": pars["nway"]}, {"LIMIT_N_WAY_TEST": pars["nway"]}, {"SAMPLES_PER_CLASS": pars["spc"]}, {"MODEL_TYPE": MODEL_TS},
                                      {"DATASETS_NAMES": pars["DATASETS_NAMES"]}, {"TGT_DATASETS": pars["TGT_DATASETS"]} ]
             exp1_2_5_run_source_permutation_experiments(moreParams=use_validation_params, exp_name="exp1_permuted_src_datasets", group_exp_name="exp1")
