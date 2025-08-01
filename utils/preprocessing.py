@@ -16,10 +16,11 @@ Constants = Constants_c.Constants
 
 
 def preprocess_image(image: np.ndarray, resize: bool = True) -> np.ndarray:
-    if resize:
-        image = cv2.resize(
-            image, Constants["INPUT_SIZE"][list(Constants['TGT_DATASETS'].keys())[0]], interpolation=cv2.INTER_AREA
-        )  # Resize
+    # if resize:
+    image = cv2.resize(
+        image, Constants["INPUT_SIZE"][list(Constants['TGT_DATASETS'].keys())[0]], interpolation=cv2.INTER_AREA
+    )  # Resize
+    
     image = image / 255  # Normalize
     image = np.transpose(image, (2, 0, 1))  # HWC -> CHW
     image = image.astype(np.float32)

@@ -60,16 +60,16 @@ def parse_files_SOTA(ds_name: str, files_set) -> Tuple[list, list]:
         for doc in os.listdir(config.images_dir):
             doc_path = os.path.join(config.images_dir, doc)
 
-            if ds_name.startswith("miniImageNet") or ds_name.startswith(Const_c.DATASETS.BREAKHIS.value) or ds_name.startswith("cifar100"):
-                images, labels = extract_image_label(label_name=doc, char=doc, doc_path=config.images_dir)
-                all_labels += labels
-                all_filepaths += images
-            elif ds_name.startswith("omniglot") :
+            if ds_name.startswith("omniglot") :
                 for char in os.listdir(doc_path):
                     label_name = doc + "_" + char
                     images, labels = extract_image_label(label_name, char, doc_path)
                     all_labels += labels
                     all_filepaths += images
+            else: #if ds_name.startswith("miniImageNet") or ds_name.startswith(Const_c.DATASETS.BREAKHIS.value) or ds_name.startswith("cifar100"):
+                images, labels = extract_image_label(label_name=doc, char=doc, doc_path=config.images_dir)
+                all_labels += labels
+                all_filepaths += images
 
     # Extract images (whole image as bbox)
     images = parse_files_no_txt_SOTA(img_filenames=all_filepaths)
@@ -168,22 +168,21 @@ def parse_files_json(
                                                             and (s_right - s_left) != 0
                                                             and (r_bottom - r_top) != 0
                                                         ):
-                                                            bboxes.append(
-                                                                preprocess_image(
-                                                                    image[
-                                                                        s_top:s_bottom,
-                                                                        s_left:s_right,
-                                                                    ]
-                                                                )
-                                                            )
-                                                            glyphs.append(
-                                                                s[
-                                                                    "agnostic_symbol_type"
+                                                            pp_image = preprocess_image(
+                                                                image[
+                                                                    s_top:s_bottom,
+                                                                    s_left:s_right,
                                                                 ]
                                                             )
+                                                            symbol = s["agnostic_symbol_type"]
+                                                            bboxes.append(
+                                                                pp_image
+                                                            )
+                                                            glyphs.append(symbol)
                                                             positions.append(
                                                                 s["position_in_staff"]
                                                             )
+                                                            store_bbox(pp_image, symbol, image_path)
 
     if return_position:
         return bboxes, positions
@@ -193,7 +192,17 @@ def parse_files_json(
 
 ####################################################################### TXT FILES [TEXT DATASETS]:
 
-
+def store_bbox(image, symbol, image_path):
+    bboxes_path = str(image_path).replace("img", "bboxes").replace("images", "bboxes")
+    bbox_filename = bboxes_path.replace("bboxes/", "bboxes/" + symbol + "_class_")
+    os.makedirs(os.path.dirname(bbox_filename), exist_ok=True)
+    if not os.path.exists(bbox_filename):
+        # Store the image
+        image = image * 255 # Desnormalize
+        image = image.transpose(1, 2, 0)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        cv2.imwrite(bbox_filename, image)
+        
 def parse_files_txt(img_filenames: list) -> Tuple[list, list]:
     bboxes = []
     glyphs = []
@@ -203,6 +212,7 @@ def parse_files_txt(img_filenames: list) -> Tuple[list, list]:
         label_path = config.labels_dir / label_filename
 
         image_path = config.images_dir / img_filename
+        
         image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         if image is not None:
@@ -215,8 +225,11 @@ def parse_files_txt(img_filenames: list) -> Tuple[list, list]:
                 y_s, x_s, y_l, x_l = [int(float(u)) for u in line_s[1:]]
 
                 if x_l > x_s and y_l > y_s:
-                    bboxes.append(preprocess_image(image[x_s:x_l, y_s:y_l]))
+                    pp_image = preprocess_image(image[x_s:x_l, y_s:y_l])
+                    bboxes.append(pp_image)
                     glyphs.append(symbol)
+
+                    store_bbox(pp_image, symbol, image_path)
 
     return bboxes, glyphs
 

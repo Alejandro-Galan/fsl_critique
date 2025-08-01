@@ -3,23 +3,27 @@ import json, os, sys
 import pandas as pd
 import numpy as np
 from enum import Enum
+from types import MappingProxyType
 
 class Const_c():
 
     class DATASETS(Enum): 
-        CAPITAN  = 'b-59-850'
-        TKH      = 'TKH'
-        BREAKHIS = 'BreaKHis_formatted' 
-        EGYPTIAN = 'Egyptian'
-        GREEK    = 'Greek'
+        CAPITAN     = 'b-59-850'
+        TKH         = 'TKH'
+        BREAKHIS    = 'BreaKHis_formatted' 
+        EGYPTIAN    = 'Egyptian'
+        GREEK       = 'Greek'
+        ORGANAMNIST = 'organamnist'
 
     json_folder = "utils/constants/"
 
 
 
-    def __init__(self, exp_num, full_name, **subparams):
+    def __init__(self, exp_num, full_name, immutable=True, **subparams):
         # Read csv with pandas
         self.folder = Const_c.json_folder + exp_num + "/"
+
+        self.immutable = immutable
 
         params = Const_c.BASE_PARAMETERS.copy()
         splt_tgt_ds = full_name.split("tgt_ds_")
@@ -31,41 +35,48 @@ class Const_c():
             params[key] = value
 
 
-        # python3 scripts/small_run_matching_networks.py exp6_same_dataset-src_ds_omniglot_SOTA_testSet exp6 MatchingNetwork-4000_E-40x40_I_S/False_FSS omniglot_SOTA_testSet_baseline_over_own_ds-5_NWAY_TRAIN-16_Batch_Size-1_KSpC-0.001_lr-0.0_ValSrc-GROUP_EXP_source_permutation-NWAY-test_5-tgt_ds_omniglot_SOTA_testSet
-        # python3 scripts/small_run_matching_networks.py exp6_permuted_src_datasets--src_ds_omniglot_SOTA_testSet exp6 RelationNetwork-4000_E-40x40_I_S/False_FSS-Egyptian-5_NWAY_TRAIN-16_Batch_Size-5_KSpC-0.001_lr-0.0_ValSrc-GROUP_EXP_source_permutation-NWAY-test_5-tgt_ds_b-59-850 
+        # python3 scripts/one_run_network.py exp6_same_dataset-src_ds_omniglot_SOTA_testSet exp6 MatchingNetwork-4000_E-40x40_I_S/False_FSS omniglot_SOTA_testSet_baseline_over_own_ds-5_NWAY_TRAIN-16_Batch_Size-1_KSpC-0.001_lr-0.0_ValSrc-GROUP_EXP_source_permutation-NWAY-test_5-tgt_ds_omniglot_SOTA_testSet
+        # python3 scripts/one_run_network.py exp6_permuted_src_datasets--src_ds_omniglot_SOTA_testSet exp6 RelationNetwork-4000_E-40x40_I_S/False_FSS-Egyptian-5_NWAY_TRAIN-16_Batch_Size-5_KSpC-0.001_lr-0.0_ValSrc-GROUP_EXP_source_permutation-NWAY-test_5-tgt_ds_b-59-850 
+        # python3 scripts/one_run_network.py exp3_no_src_datasets-src_ds___NO_SRC_DATASET exp3 PrototypicalNetwork-4000_E-40x40_I_S/False_FSS-NO_SRC_DATASET-5_NWAY_TRAIN-16_Batch_Size-1_KSpC-0.001_lr-0.0_ValSrc-GROUP_EXP_source_permutation-NWAY-test_5-tgt_ds_omniglot_SOTA_testSet
         debug_modifying = False
         if "6" in exp_num:  # or "1" in exp_num: 
             params['SAMPLES_PER_CLASS'] = 1 #1 #5
             params['MODEL_TYPE'] = 'RelationNetwork' #'PrototypicalNetwork' #'RelationNetwork'
-            params['DATASETS_NAMES'] =  {"omniglot_SOTA_trainSet": {}} #{'NO_SRC_DATASET': {}} #{"omniglot_SOTA_trainSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_trainSet": {}}
-            params['TGT_DATASETS']   =  {"omniglot_SOTA_testSet": {}} #{"omniglot_SOTA_testSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_testSet": {}}
-            params['OVERWRITE_LOGS'] = False
-            params["EPISODES"] = 4000 #2000
-            params["BOOTSTRAP_ITERS"] = 5
+            params['DATASETS_NAMES'] =  {'NO_SRC_DATASET': {}} #{'NO_SRC_DATASET': {}} #{"omniglot_SOTA_trainSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_trainSet": {}}
+            params['TGT_DATASETS']   =  {Const_c.DATASETS.EGYPTIAN.value: {}} #{"omniglot_SOTA_testSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_testSet": {}}
+            params["EPISODES"] = 111 #2000
+            params["BOOTSTRAP_ITERS"] = 1
             params["epochsFineTuning"] = 3 #3
             params["BATCH_SIZE"] = 16 #16
             params["LIMIT_N_WAY_TRAIN"] = 5
             params["LIMIT_N_WAY_TEST"] = 5
+            params["group_experiment"] = "testing6" 
 
             
-            # params["ReusePretrained"] = False
-            # params["NoSrcDataset"] = True
+            params['OVERWRITE_LOGS'] = True
+            params["ReusePretrained"] = True
+            params["NoSrcDataset"] = True
+            params["DEBUG_IMAGES"] = True
+            # params["ALL_DATASETS"] = False # exp4
 
             # params["CLUSTERING"] = "CONSTRAINED-KMEANS"
-            # params["M-labels-SRC"] = 1000
+            # params["M-labels-SRC"] = 15
             # params["SMALL_TEST_SET"] = True
+
+            # params["SIMCLR"]   = "supportSet"
+
             
             debug_modifying = True
 
         params = Const_c.adjust_parameters(params)
-        self.Constants = params
+        self.Constants = MappingProxyType(params) if self.immutable else params
 
         os.makedirs(self.folder, exist_ok=True)
         self.json_file = self.folder + "constants_" + str(full_name) + ".json"
         if not debug_modifying:
             if os.path.exists(self.json_file):
                 with open(self.json_file, 'r') as f:
-                    self.Constants = json.load(f)
+                    self.Constants = MappingProxyType(json.load(f)) if self.immutable else json.load(f)
 
     def adjust_parameters(params):
 
@@ -107,7 +118,7 @@ class Const_c():
         os.makedirs(os.path.dirname(self.json_file), exist_ok=True)
         with open(self.json_file, 'w') as f:
             json.dump(params, f)
-        self.Constants = params
+        self.Constants = MappingProxyType(params) if self.immutable else params
 
     def remove_constants_file(self):
         if os.path.exists(self.json_file):
@@ -193,7 +204,7 @@ class Const_c():
         exp_name_sufix += "-" + str(Constants['LIMIT_N_WAY_TRAIN']) + "-nwayTrain"
         # else:
         # exp_name_sufix += "--" + str(5) + "-nwayTrain"
-        return "DISTANCES/" + "src_ds_name-" + ds_name + "-" + exp_name_sufix 
+        return "DISTANCES/" + Constants["MODEL_TYPE"] + "/src_ds_name-" + ds_name + "-" + exp_name_sufix 
 
     def get_distances_path(Constants, sufix_path, boots_iter):
         # if is type list
@@ -334,6 +345,8 @@ class Const_c():
         
         "cifar100_SOTA_trainSet"     : (40,40),
         "cifar100_SOTA_testSet"      : (40,40),
+
+        DATASETS.ORGANAMNIST.value   : (40,40),
     }
 
 
@@ -400,10 +413,14 @@ class Const_c():
 
 
     BASE_PARAMETERS["SOTA_DATASETS"] = ["omniglot", "miniImageNet", "omniglot_SOTA_testSet", "miniImageNet_SOTA_testSet",
-                    "omniglot_SOTA_trainSet", "miniImageNet_SOTA_trainSet", "cifar100_SOTA_trainSet", "cifar100_SOTA_testSet"] #, "BreaKHis_formatted"]
+                    "omniglot_SOTA_trainSet", "miniImageNet_SOTA_trainSet", "cifar100_SOTA_trainSet", "cifar100_SOTA_testSet",
+                    "organamnist"] #, "BreaKHis_formatted"]
                     
-    BASE_PARAMETERS["ALL_SRC_DATASETS"] = ["TKH", "b-59-850", "Egyptian", "Greek", "omniglot_SOTA_trainSet", "miniImageNet_SOTA_trainSet"] #, "BreaKHis_formatted"]
-    BASE_PARAMETERS["NUM_SRC_CLASSES_DATASETS"] = {"TKH":347, "b-59-850":28, "Egyptian":18, "Greek":112, "omniglot_SOTA_trainSet":1623, "miniImageNet_SOTA_trainSet":100} #, "BreaKHis_formatted":8}
+    # BASE_PARAMETERS["ALL_SRC_DATASETS"] = ["TKH", "b-59-850", "Egyptian", "Greek", "omniglot_SOTA_trainSet", "miniImageNet_SOTA_trainSet", "cifar100_SOTA_trainSet"] #, "BreaKHis_formatted"]
+    BASE_PARAMETERS["ALL_TST_DATASETS"] = ["TKH", "b-59-850", "Egyptian", "Greek", "omniglot_SOTA_testSet", "miniImageNet_SOTA_testSet", "cifar100_SOTA_testSet", "organamnist"] #, "BreaKHis_formatted"]
+    BASE_PARAMETERS["NUM_SRC_CLASSES_DATASETS"] = {"TKH":347, "b-59-850":28, "Egyptian":18, "Greek":112, "omniglot_SOTA_trainSet":1623, "miniImageNet_SOTA_trainSet":100, 
+                                                   "cifar100_SOTA_trainSet":80, "omniglot_SOTA_testSet":338, "miniImageNet_SOTA_testSet":20, "cifar100_SOTA_testSet":6,
+                                                   "organamnist": 11} #, "BreaKHis_formatted":8}
 
 
     if not BASE_PARAMETERS["FineTuning"]:
@@ -416,7 +433,7 @@ class Const_c():
     BASE_PARAMETERS["LIMIT_VALIDATION_SRC_SRC"] = BASE_PARAMETERS["EPISODES"] / 20 # 10 evaluations 
 
     #### Training conf
-    BASE_PARAMETERS["PATIENCE"] = 5
+    BASE_PARAMETERS["PATIENCE"] = 20 #5
     BASE_PARAMETERS["EXCLUDE_CLASSES_WITH_LESS_SAMPLES"] = True
 
 
@@ -445,7 +462,15 @@ class Const_c():
     #### Clustering experiment / proposal. Expecting type
     BASE_PARAMETERS["CLUSTERING"]   = ""
     BASE_PARAMETERS["M-labels-SRC"] = -1 # If -1, m = n
-    
+
+    #### SimCLR
+    BASE_PARAMETERS["SIMCLR"]   = ""
+
+    #### Stores images and distances
+    BASE_PARAMETERS["DEBUG_IMAGES"] = False #False
+    # This is to evaluate each iteration of FineTuning, instead of at the end of each "epoch"
+    BASE_PARAMETERS["EXHAUSTIVE_LOSS_CURVES"] = False 
+
 
 
     # greek_comparative = False

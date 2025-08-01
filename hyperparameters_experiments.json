@@ -2,40 +2,30 @@
     "NWAY": {
         "1": 5,
         "3": 5,
-        "4": 20,
-        "10": 5,
-        "6": 5
+        "4": 5,
+        "10": 20,
+        "13": 5
     },
     "SPC_OW": {
-        "1": [
-            1,5
-        ],
-        "3": [
-            1,5
-        ],
-        "4": [
-            1, 5
-        ],
-        "10": [
-            1, 5
-        ],
-        "6": [ 1 ]
+        "1":  [ 1, 5 ],
+        "3":  [ 1, 5 ],
+        "4":  [ 1, 5 ],
+        "10": [ 10 ],
+        "13": [ 1, 5 ]
     },
     "MODEL_TS": {
-        "1": [
-            "RelationNetwork"
-        ],
-        "3": [
-            "MatchingNetwork", "PrototypicalNetwork"
-        ],
-        "4": [
-             "PrototypicalNetwork", "MatchingNetwork"
-        ],
-        "10": [
-            "PrototypicalNetwork"
-        ],
-        "6": [
-            "PrototypicalNetwork"
-        ]
-    }
+        "1": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"],
+        "3": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"],
+        "4": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"],
+        "10": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"],
+        "13": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"]
+    },
+    "BOOTSTRAP_ITERS": {
+        "1":  5,
+        "3":  5,
+        "4":  5,
+        "10": 5,
+        "13": 5
+    },
+    "EXHAUSTIVE_LOSS_CURVES": false
 }

@@ -6,3 +6,4 @@ weights*
 .cache*
 WEIGHTS
 logs_csv
+utils/stored_sets

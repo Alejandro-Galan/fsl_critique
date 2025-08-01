@@ -4,7 +4,9 @@ from torch.autograd import Variable
 
 from utils import constants
 importlib.reload(constants)
+from utils.train_utils import split_train_test, debug_images_and_dists
 from utils.constants import Const_c
+from datasets.loader import apply_simclr_augmentation, get_params_for_loading_datasets
 # Initialize reading the json constants file for each experiment
 exp = str(sys.argv[2])
 full_name = str(sys.argv[3])
@@ -164,7 +166,7 @@ class FewShotTrain():
         # return total_c_loss, total_accuracy, optimizer
 
 
-    def eval_few_shot_net(batch_size, encoder, X, Y, X_train, Y_train, device, classes_per_set, samples_per_class, metrics, model_type="Original", supp_set=None, finetune=False, set="Test"):
+    def eval_few_shot_net(batch_size, encoder, X, Y, X_train, Y_train, device, classes_per_set, samples_per_class, metrics, model_type="Original", supp_set=None, finetune=False, set="Test", debug_images=False):
         All_acc, All_out, All_dists = [], [], []
 
         encoder.eval()
@@ -239,15 +241,29 @@ class FewShotTrain():
                         elif model_type == "PrototypicalNetwork":
                             output, inputs_y = PrototypicalNetwork.get_outputs(x_target, y_target, x_support_set, y_support_set, encoder)
                             acc, c_loss, dists = prototypical_loss(output, target=inputs_y, n_support=samples_per_class, samples_per_class=samples_per_class, batch_size=batch_size)
+                            if debug_images:
+                                debug_images_and_dists(x_target, x_support_set, dists, debug_images=debug_images)
                         elif model_type == "RelationNetwork":
-                            acc, c_loss, _, _ = encoder(x_support_set.cuda(), y_support_set.cuda(), x_target.cuda(), y_target.cuda(), train=False, SAMPLE_NUM_PER_CLASS=samples_per_class, CLASS_NUM=classes_per_set)
+                            acc, c_loss, _, dists = encoder(x_support_set.cuda(), y_support_set.cuda(), x_target.cuda(), y_target.cuda(), train=False, SAMPLE_NUM_PER_CLASS=samples_per_class, CLASS_NUM=classes_per_set)
+                            dists = torch.Tensor(np.array(dists))
+                            if debug_images:
+                                debug_images_and_dists(x_target, x_support_set, dists, debug_images=debug_images)
+                        
 
                         # if exp == "exp3" or exp == "exp6" and model_type == "PrototypicalNetwork":
-                        if exp == "exp3" and model_type == "PrototypicalNetwork":
-                            if len(All_dists) == 0:
-                                All_dists = dists.cpu().numpy()
-                            else:
-                                All_dists = np.concatenate( (All_dists, dists.cpu().numpy() ), axis=0)
+                        if exp == "exp3":
+                            if model_type == "RelationNetwork":
+                                if len(All_dists) == 0:
+                                    All_dists = dists.cpu().numpy()
+                                else:
+                                    All_dists = np.concatenate( (All_dists, dists.cpu().numpy() ), axis=0)
+                            if model_type == "PrototypicalNetwork":
+                                if len(All_dists) == 0:
+                                    All_dists = dists.cpu().numpy()
+                                else:
+                                    All_dists = np.concatenate( (All_dists, dists.cpu().numpy() ), axis=0)
+
+
 
                         All_acc.append(acc.cpu().item())
 
@@ -258,13 +274,10 @@ class FewShotTrain():
                                 All_out.append(output )
                 
                     if (ind / batch_size) % 5 == 0:
-                        try:
-                            if finetune:
-                                iter_out = "Finetune: " + set + " Accuracy: " + str(np.mean(All_acc) )
-                            else:
-                                iter_out = ">: " + set + " Accuracy: " + str(np.mean(All_acc) )
-                        except:
-                            breakpoint()
+                        if finetune:
+                            iter_out = "Finetune: " + set + " Accuracy: " + str(np.mean(All_acc) )
+                        else:
+                            iter_out = ">: " + set + " Accuracy: " + str(np.mean(All_acc) )
                         pbar.set_description(iter_out)
                         pbar.update(5)
                 # Asegúrate de actualizar la barra de progreso al final
@@ -375,10 +388,20 @@ class FewShotTrain():
                 pbar.update(1)
                 # self.total_train_iter+=1
 
-
                 # limit = 20 if total_train_batches > 20 else total_train_batches
                 limit = total_train_batches  # One per epoch
-                if (i + 1) % limit == 0:
+
+                end_of_epoch = ( (i + 1) % limit == 0 )
+
+                ## For each episode
+                case_loss_curves_exp3 = ft_epoch_num == 2 and exp == "exp3" and (model_type == "PrototypicalNetwork" or model_type == "RelationNetwork")
+                if not Constants["EXHAUSTIVE_LOSS_CURVES"]:
+                    case_loss_curves_exp3 = case_loss_curves_exp3 and end_of_epoch
+                
+                
+                ## DEBUG to print exhaustive loss curves, only
+                if end_of_epoch or case_loss_curves_exp3:
+                # if end_of_epoch:
                 # if True:
                     encoder.eval()
                     # supp_set = {"imgs": X, "labels": Y}
@@ -390,44 +413,46 @@ class FewShotTrain():
                     # Only this distances
                     # For all ft_epoch_nums
                     # if ft_epoch_num == 2 and not Constants["DEACTIVATE_WANDB"] and (exp == "exp3" or exp == "exp6") and model_type == "PrototypicalNetwork":
-                    if ft_epoch_num == 2 and not Constants["DEACTIVATE_WANDB"] and (exp == "exp3") and model_type == "PrototypicalNetwork":
+                    # if ft_epoch_num == 2 and not Constants["DEACTIVATE_WANDB"] and case_loss_curves_exp3:
+                    if not Constants["DEACTIVATE_WANDB"] and case_loss_curves_exp3:
                         path_distances = Const_c.get_distances_path(Constants=Constants, sufix_path="_after_ft_distances", boots_iter=boots_iter)
                         # if not os.path.exists(os.path.dirname(path_distances)):
                         if not os.path.exists(path_distances):
                             os.makedirs(os.path.dirname(path_distances), exist_ok=True)
-                            FewShotTrain.calculate_distances(encoder, dists, test_accs_std, list(Constants["TGT_DATASETS"].keys())[0], model_type, device, batch_size, classes_per_set, samples_per_class, boots_iter=boots_iter)
+                            FewShotTrain.calculate_distances(encoder, dists, test_accs_std, list(Constants["TGT_DATASETS"].keys())[0], model_type, device, batch_size, classes_per_set, samples_per_class, boots_iter=boots_iter, end_of_epoch=end_of_epoch)
 
 
                     # print("TEST ACCS", test_accs)
                     if not Constants["DEACTIVATE_WANDB"]:
                         wandb.log({"ft_eval_acc": test_accs, "ft_eval_loss": test_loss})
 
-                    if test_accs > metrics['best_accuracy']:
-                        # print(
-                        #     f"Test accuracy improved from {best_accuracy:.2f} to {test_accs:.2f}"
-                        # )
+                    if end_of_epoch:
+                        if test_accs > metrics['best_accuracy']:
+                            # print(
+                            #     f"Test accuracy improved from {best_accuracy:.2f} to {test_accs:.2f}"
+                            # )
 
-                        metrics['best_accuracy'] = test_accs
-                        best_epoch = i
-                        # metrics['best_class_rep'] = classification_report(y_true=Y_eval.cpu().tolist(), y_pred=test_outputs.cpu(), output_dict=True)
+                            metrics['best_accuracy'] = test_accs
+                            best_epoch = i
+                            # metrics['best_class_rep'] = classification_report(y_true=Y_eval.cpu().tolist(), y_pred=test_outputs.cpu(), output_dict=True)
 
-                        # If not exists (For example if using no pretrained weights)
-                        os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+                            # If not exists (For example if using no pretrained weights)
+                            os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
 
-                        try:
-                            new_path = Const_c.get_id_extensions(Constants, prev_str=checkpoint_path)
-                            FewShotTrain.store_encoder(encoder, optimizer=optimizer, new_path=new_path, model_type=model_type)
-                        except:
-                            # Assuming the name is too long, lets try with a dictionary
-                            coded_path = Const_c.add_to_dictionary_of_files(Const_c.get_id_extensions(Constants, prev_str=checkpoint_path)) + ".pt"
-                            FewShotTrain.store_encoder(encoder, optimizer=optimizer, new_path=coded_path, model_type=model_type)
-                        epochs_no_improve = 0
+                            try:
+                                new_path = Const_c.get_id_extensions(Constants, prev_str=checkpoint_path)
+                                FewShotTrain.store_encoder(encoder, optimizer=optimizer, new_path=new_path, model_type=model_type)
+                            except:
+                                # Assuming the name is too long, lets try with a dictionary
+                                coded_path = Const_c.add_to_dictionary_of_files(Const_c.get_id_extensions(Constants, prev_str=checkpoint_path)) + ".pt"
+                                FewShotTrain.store_encoder(encoder, optimizer=optimizer, new_path=coded_path, model_type=model_type)
+                            epochs_no_improve = 0
 
-                    else:
-                        epochs_no_improve += 1
-                        if epochs_no_improve >= metrics['PATIENCE']:
-                            print("Early stopping triggered")
-                            break
+                        else:
+                            epochs_no_improve += 1
+                            if epochs_no_improve >= metrics['PATIENCE']:
+                                print("Early stopping triggered")
+                                break
 
 
                     encoder.train()
@@ -436,43 +461,58 @@ class FewShotTrain():
 
 
     # Calculate distances from the encoder trained only on few-shot of the other src datasets
-    def calculate_distances(encoder, dists_base, accs_base, ds_name, model_type, device, batch_size, classes_per_set, samples_per_class, boots_iter): 
+    def calculate_distances(encoder, dists_base, accs_base, ds_name, model_type, device, batch_size, classes_per_set, samples_per_class, boots_iter, end_of_epoch): 
         path_distances = Const_c.get_distances_path(Constants=Constants, sufix_path="_after_ft_distances", boots_iter=boots_iter)
         os.makedirs(os.path.dirname(path_distances), exist_ok=True)
-        FewShotTrain.store_distances(dists_base, accs= accs_base, full_path= path_distances)
+        if end_of_epoch:
+            np.testing.assert_equal(len(dists_base) > 0, True)
+            FewShotTrain.store_distances(dists_base, accs= accs_base, full_path= path_distances)
         
-        all_src_ds = Constants["ALL_SRC_DATASETS"]
-
+        all_src_ds = Constants["ALL_TST_DATASETS"]
         for src_ds in all_src_ds:
             # try:
             if Constants["NUM_SRC_CLASSES_DATASETS"][src_ds] < Constants["LIMIT_N_WAY_TEST"]:
                 continue
-            if src_ds == ds_name:
-                # print("Skipping distances for the same dataset as target:", src_ds)
-                continue
-            if ds_name.startswith("omniglot_SOTA_") and src_ds.startswith("omniglot_SOTA_"):
-                continue
-            if ds_name.startswith("miniImageNet_SOTA_") and src_ds.startswith("miniImageNet_SOTA_"):
-                continue
+
+            # if src_ds == ds_name:
+            #     # print("Skipping distances for the same dataset as target:", src_ds)
+            #     continue
+            # if ds_name.startswith("omniglot_SOTA_") and src_ds.startswith("omniglot_SOTA_"):
+            #     continue
+            # if ds_name.startswith("miniImageNet_SOTA_") and src_ds.startswith("miniImageNet_SOTA_"):
+            #     continue
 
             ## Load only the training src dataset
             pretrained_sources = True if Constants["NoSrcDataset"] else pretrained_sources
 
             # If no validation src paramenter, Xval is empty
+            ## Get just the test partition!!
             data_dict = load_supervised_data(ds_name=src_ds, min_occurence=50, all_datasets=False, pretrained_sources=pretrained_sources, boots_iter=boots_iter)
+
+            PARAMS = get_params_for_loading_datasets(src_datasets="NO_SRC_DATASET", ds_name=src_ds, samples_per_class=samples_per_class, run=boots_iter, Constants=Constants)
+            XTrain, YTrain, XTest, YTest, XSupp, YSupp, XVal, YVal = split_train_test(
+                PARAMS=PARAMS,
+                X=data_dict["X_tgt"], 
+                Y=data_dict["Y_tgt"],
+            )
             
-            
-            XTrain, YTrain = data_dict["X_tgt"], data_dict["Y_tgt"]
+            X_obj_ds, Y_obj_ds = XTest, YTest
+
+            debug_images_prefix = False
+            if Constants["DEBUG_IMAGES"] and end_of_epoch:
+                debug_images_prefix = Constants["MODEL_TYPE"] + "/trained_" + ds_name + "_over_" + src_ds + "/"
 
             encoder.eval()
-            test_accs_std, test_loss, test_outputs, dists_src = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=torch.from_numpy(XTrain), Y=torch.from_numpy(YTrain), X_train=None, Y_train=None,
-                                    device=device, model_type=model_type, supp_set=None, classes_per_set=classes_per_set, samples_per_class=samples_per_class, metrics={}, finetune=True)
+            test_accs_std, test_loss, test_outputs, dists_src = FewShotTrain.eval_few_shot_net(batch_size=batch_size, encoder=encoder, X=torch.from_numpy(X_obj_ds), Y=torch.from_numpy(Y_obj_ds), X_train=None, Y_train=None,
+                                    device=device, model_type=model_type, supp_set=None, classes_per_set=classes_per_set, samples_per_class=samples_per_class, metrics={}, finetune=True, debug_images=debug_images_prefix)
             test_accs = test_accs_std[0]
             # Store also accs
             path_distances_src = Const_c.get_distances_path(Constants=Constants, sufix_path="ft_distances_over_" + src_ds + "as_tgt_ds", boots_iter=boots_iter)
-            FewShotTrain.store_distances(dists_src, accs= test_accs_std, full_path=path_distances_src )
-            # except:
+            if end_of_epoch:
+                FewShotTrain.store_distances(dists_src, accs= test_accs_std, full_path=path_distances_src )
+            # except: 
             #     print("Error calculating distances for dataset:", src_ds)
+            wandb.log({"test_acc- " + src_ds + "_trained_on- " + ds_name: test_accs, "test_loss- " + src_ds + "_trained_on- " + ds_name: test_loss })
 
 
     def store_distances(dists, accs, full_path):
@@ -553,27 +593,17 @@ class FewShotTrain():
         # Assumed to use all classes
         all_classes = np.unique(Y)
             
-        if len(all_classes) < classes_per_set:
-            print("LENALLCLASSES", len(all_classes), "CLASSES_PER_SET", classes_per_set)
-            if exp == "exp6":
-                breakpoint()
         np.testing.assert_equal(len(all_classes) >= classes_per_set, True)
         np.testing.assert_equal(exc < len(Y), True)
 
         # if set == "train":
         # np.random.shuffle(all_classes)
 
-        try:
-            # if exp == "exp6":
-            #     breakpoint()
-            subset_classes = [x for x in all_classes if x != Y[exc]]
+        subset_classes = [x for x in all_classes if x != Y[exc]]
 
-            subset_classes = random.sample(subset_classes, classes_per_set - 1)
-            subset_classes.append(Y[exc].item())
-        except:
-            print("ALLCLASSES", all_classes, exc)
-            breakpoint()
-            print(subset_classes, classes_per_set)
+        subset_classes = random.sample(subset_classes, classes_per_set - 1)
+        subset_classes.append(Y[exc].item())
+
         if Constants["SHUFFLE_SUPP_SET"]:
             random.shuffle(subset_classes)
         else:
@@ -632,6 +662,7 @@ class FewShotTrain():
         
         # return supp_v, query_v
 
+    # OnlyNK applies for the special FineTuning phase after pretraining
     def get_subsamples_sets( X, Y, index_batch, classes_per_set, metrics, model_type="", 
                             samples_per_class=1, set="train", only_nk=False, change_classes_alias=False):
 
@@ -658,48 +689,48 @@ class FewShotTrain():
             target_x = np.zeros((batch_size, classes_per_set, X.shape[1], X.shape[2], X.shape[3]), np.float32)
             target_y = np.zeros((batch_size, classes_per_set), np.int32)
 
-        if condition == "prefixed_support_set":
+        # if condition == "prefixed_support_set":
 
-            ## Get sets
-            total_data = classes_per_set * samples_per_class
+        #     ## Get sets
+        #     total_data = classes_per_set * samples_per_class
 
-            assert total_data == len(metrics['YSupp'])
-            support_set_x = np.zeros((batch_size, total_data,
-                                        X.shape[1], X.shape[2], X.shape[3]), np.float32)
-            support_set_y = np.zeros((batch_size, total_data), np.int32)
+        #     assert total_data == len(metrics['YSupp'])
+        #     support_set_x = np.zeros((batch_size, total_data,
+        #                                 X.shape[1], X.shape[2], X.shape[3]), np.float32)
+        #     support_set_y = np.zeros((batch_size, total_data), np.int32)
 
-            for b in range(batch_size):
-                exc = index_batch[b]
+        #     for b in range(batch_size):
+        #         exc = index_batch[b]
 
-                if model_type == "PrototypicalNetwork":
-                    exc, y_supp = get_multiple_querys(exc, Y, metrics['YSupp'], only_nk)
-                elif model_type == "MatchingNetwork":
-                    exc, y_supp = get_one_query(exc, Y, metrics['YSupp'], only_nk)
-                elif model_type == "RelationNetwork":
-                    exc, y_supp = get_multiple_querys(exc, Y, metrics['YSupp'], only_nk)
+        #         if model_type == "PrototypicalNetwork":
+        #             exc, y_supp = get_multiple_querys(exc, Y, metrics['YSupp'], only_nk)
+        #         elif model_type == "MatchingNetwork":
+        #             exc, y_supp = get_one_query(exc, Y, metrics['YSupp'], only_nk)
+        #         elif model_type == "RelationNetwork":
+        #             exc, y_supp = get_multiple_querys(exc, Y, metrics['YSupp'], only_nk)
 
-                # change Y labels to equal size of num_classes 
-                if Y[exc].item() not in y_supp:
-                    breakpoint()
-                supp_y, exc_y = FewShotTrain.codify_subset_classes(y_supp, Y[exc], classes_per_set, model_type)
-                ############ DEBUG ##################
-                # index_debug_fixed = np.arange(0,samples_per_class)
-                # supp_y, exc_y = FewShotTrain.codify_subset_classes(Y[index_debug_fixed], Y[exc], classes_per_set)
-                #####################################
+        #         # change Y labels to equal size of num_classes 
+        #         if Y[exc].item() not in y_supp:
+        #             breakpoint()
+        #         supp_y, exc_y = FewShotTrain.codify_subset_classes(y_supp, Y[exc], classes_per_set, model_type)
+        #         ############ DEBUG ##################
+        #         # index_debug_fixed = np.arange(0,samples_per_class)
+        #         # supp_y, exc_y = FewShotTrain.codify_subset_classes(Y[index_debug_fixed], Y[exc], classes_per_set)
+        #         #####################################
 
-                supp_x, supp_y = metrics['XSupp'], supp_y
-                if Constants["SHUFFLE_SUPP_SET"]:
-                    p = np.random.permutation(len(supp_y))
-                    supp_x, supp_y = metrics['XSupp'][p], supp_y[p]
+        #         supp_x, supp_y = metrics['XSupp'], supp_y
+        #         if Constants["SHUFFLE_SUPP_SET"]:
+        #             p = np.random.permutation(len(supp_y))
+        #             supp_x, supp_y = metrics['XSupp'][p], supp_y[p]
 
-                support_set_x[b] = supp_x
-                support_set_y[b] = supp_y
+        #         support_set_x[b] = supp_x
+        #         support_set_y[b] = supp_y
 
-                target_x[b] = X[exc] 
-                target_y[b] = exc_y
+        #         target_x[b] = X[exc] 
+        #         target_y[b] = exc_y
 
 
-        elif condition == "supp_from_train_set":
+        if condition == "supp_from_train_set":
             ## Get sets
             # max_c = min(classes_per_set, len(np.unique(Y)))
             max_c = classes_per_set
@@ -708,38 +739,54 @@ class FewShotTrain():
                                         X.shape[1], X.shape[2], X.shape[3]), np.float32)
             support_set_y = np.zeros((batch_size, total_data), np.int32)
 
-            # In case of RN, repeat the supp all batches
-            first_supp = False
+            # Any augmentation?
+            augment_query_case, augment_supp_case = False, False
+            if set == "train" and not only_nk:
+                augment_query_case = True if (Constants["SIMCLR"] == "query") else False
+                augment_supp_case  = True if (Constants["SIMCLR"] == "supportSet") else False
 
             for b in range(batch_size):
                 exc = index_batch[b]
                 
-                # if not first_supp or not model_type == "RelationNetwork":
                 supp_index = FewShotTrain.get_support_set_index(Y, exc, max_c, samples_per_class, only_nk=only_nk)
-                    # first_supp = True
 
                 if model_type == "PrototypicalNetwork":
-                    exc = get_multiple_querys(exc, Y, supp_index)
+                    out_1, out_2 = get_multiple_querys(exc, Y, X, supp_index, set=set, only_nk=only_nk)
                 elif model_type == "MatchingNetwork":
-                    exc = get_one_query(exc, Y, supp_index, only_nk)
+                    out_1, out_2 = get_one_query(exc, Y, X, supp_index, set=set, only_nk=only_nk)
                 elif model_type == "RelationNetwork":
-                    exc = get_multiple_querys(exc, Y, supp_index)
+                    out_1, out_2 = get_multiple_querys(exc, Y, X, supp_index, set=set, only_nk=only_nk)
 
+                # # change Y labels to equal size of num_classes  
+                # supp_y, exc_y = FewShotTrain.codify_subset_classes(Y[supp_index], Y[exc], max_c, model_type)
 
-                # change Y labels to equal size of num_classes 
-                supp_y, exc_y = FewShotTrain.codify_subset_classes(Y[supp_index], Y[exc], max_c, model_type)
+                supp_y = Y[supp_index]
+                if not augment_query_case:
+                    if not augment_supp_case:
+                        exc_y = Y[out_1]
+                        exc_x = X[out_1]                         
+                    # Augment support set
+                    else:
+                        exc_y = out_2["query_class"]
+                        exc_x = out_2["query_obj"]
+                # Augment only query
+                else:
+                    exc_y = Y[out_1]
+                    exc_x = out_2
 
                 supp_x, supp_y = X[supp_index], supp_y
                 if Constants["SHUFFLE_SUPP_SET"]:
                     p = np.random.permutation(len(supp_y))
                     supp_x, supp_y = X[supp_index][p], supp_y[p]
 
+                if augment_supp_case:
+                    supp_x = out_1
 
                 support_set_x[b] = supp_x # Random subset to train
                 support_set_y[b] = supp_y # np.expand_dims(y_temp[:], axis=1)
-                
-                target_x[b] = X[exc] 
+                target_x[b] = exc_x 
                 target_y[b] = exc_y
+
 
 
         elif condition == "all_training_data":
@@ -794,56 +841,128 @@ class FewShotTrain():
 
 
 # N_query for each class needed at PrototypicalNetworks
-def get_multiple_querys(exc, Y, supp_index, only_nk=False):
-    new_exc = []
+def get_multiple_querys(exc, Y, X, supp_index, set, only_nk=False):
+    new_exc, new_exc_obj = [], []
     # Only classes present in supp
-    if not only_nk:
-        supp_classes = np.unique(Y[supp_index])
-    else:
-        supp_classes = np.unique(supp_index)
+    supp_classes, counts = np.unique(Y[supp_index], return_counts=True)
 
-    for class_ in supp_classes:
-        index = (Y == class_).nonzero(as_tuple=True)[0]
-
-        if exc in index:
-            new_exc.append(exc)
-        else:
-            if not only_nk:
-                sub_index = [i for i in index if i not in supp_index]
-                if len(sub_index) > 1:
-                    index = sub_index
-            
-            new_exc.append(np.random.choice(index, Constants["n_query"], replace=False)[0])
-    return new_exc
-
-
-# Just one query from same class than Ysupp for MatchingNetwork
-def get_one_query(exc, Y, supp_index, only_nk=False):
-    # Only classes present in supp
-    supp_classes = np.unique(Y[supp_index])
     # if not only_nk:
     #     supp_classes = np.unique(Y[supp_index])
     # else:
     #     supp_classes = np.unique(supp_index)
 
-    # Choose a random int from the class
-    random_int = np.random.randint(0, len(supp_classes))
+    if Constants["SIMCLR"] == "supportSet" and set == "train" and not only_nk:
+        new_supp_xs, query = augment_support_only(supp_index, supp_classes, X, Y, multiple_query=True)
 
-    index = (Y == supp_classes[random_int]).nonzero(as_tuple=True)[0]
+        return new_supp_xs, query
 
-    # Check if exc is from the supp set, if not choose other one
-    if exc in index:
-        new_exc = exc
+    for class_ in supp_classes:
+
+        # For exp augmentation on only query. This is train but not on the support set on the special FineTuning phase
+        if Constants["SIMCLR"] == "query" and set == "train" and not only_nk:
+            # Choose one samples of class class_. (Supp_index are index because inside here is not only_nk)
+            class_x_samples = np.array(supp_index[(Y[supp_index] == class_).nonzero(as_tuple=True)[0]])
+            if class_x_samples.size > 1:
+                sample_index_x = int(class_x_samples[np.random.randint(0, class_x_samples.size)].item())
+            else:
+                sample_index_x = int(class_x_samples.item())
+
+            img_to_augment = X[sample_index_x]
+            new_exc.append( sample_index_x )
+            new_exc_obj.append( apply_simclr_augmentation(img_to_augment) )
+        
+        
+        else:
+            index = (Y == class_).nonzero(as_tuple=True)[0]
+
+            if exc in index:
+                new_exc.append(exc)
+            else:
+                if not only_nk:
+                    sub_index = [i for i in index if i not in supp_index]
+                    if len(sub_index) > 1:
+                        index = sub_index
+
+                new_exc.append(np.random.choice(index, Constants["n_query"], replace=False)[0])
+
+    if len(new_exc_obj) != 0:
+        return new_exc, torch.stack(new_exc_obj)
+    return new_exc, None
+
+# Just one query from same class than Ysupp for MatchingNetwork
+def get_one_query(exc, Y, X, supp_index, set, only_nk=False):
+    # Only classes present in supp
+    supp_classes, counts = np.unique(Y[supp_index], return_counts=True)
+    spc = counts[0]
+
+    # For exp augmentation on only query. This is train but not on the support set on the special FineTuning phase
+    if Constants["SIMCLR"] == "query" and set == "train" and not only_nk:
+        sample_index_x = supp_index[np.random.randint(0, len(supp_index))]
+        img_to_augment = X[sample_index_x]
+        new_exc_obj = apply_simclr_augmentation(img_to_augment)
+        return sample_index_x, new_exc_obj
+    # Choose only 1 sample per class, after that augment those k times. Also not preserving query
+    elif Constants["SIMCLR"] == "supportSet" and set == "train" and not only_nk:
+        new_supp_xs, query = augment_support_only(supp_index, supp_classes, X, Y, multiple_query=False)
+        return new_supp_xs, query
+
+    # Add a query from the Y set    
     else:
-        if not only_nk:
-            sub_index = [i for i in index if i not in supp_index]
-            if len(sub_index) > 1:
-                index = sub_index
-        try:        
+        # Choose a random int from the class
+        random_int = np.random.randint(0, len(supp_classes))
+
+        # Set of Y samples from same supp classes, of the obj class
+        index = (Y == supp_classes[random_int]).nonzero(as_tuple=True)[0]
+        # Check if exc is already one of the searched classes
+        if exc in index:
+            new_exc = exc
+        else:
+            # In the standard case, we do not want to include one of the samples in the support set as query
+            if not only_nk:
+                sub_index = [i for i in index if i not in supp_index]
+                if len(sub_index) > 1:
+                    index = sub_index
+            # try:        
             new_exc = np.random.choice(index, Constants["n_query"], replace=False)[0]
-        except:
-            breakpoint()
-    return new_exc
+            # except:
+            #     breakpoint()
+        return new_exc, None
+
+
+def augment_support_only(supp_index, supp_classes, X, Y, multiple_query=False):
+    num_classes = len(supp_classes)
+    # extract only n random samples, the rest will not be used 
+    sample_indexes_x = np.array(supp_index)[np.random.randint(0, len(supp_index), num_classes)]
+    query_obj, query_class = torch.tensor([]), torch.tensor([])
+    if not multiple_query:
+        sample_index_x_q   = sample_indexes_x[np.random.randint(0, len(sample_indexes_x))]
+        query_obj, query_class  = X[sample_index_x_q], Y[sample_index_x_q]
+
+    new_supp_xs = torch.tensor([])
+    dictionary_classes = {}
+    # TODO reuse the supp_Y to not change it
+    # Times to augment new x images. Iterate through real array
+    for s_index in supp_index:
+        real_class  = Y[s_index].item()
+        if real_class not in dictionary_classes:
+            dictionary_classes[real_class] = len(dictionary_classes)
+            index_q = sample_indexes_x[dictionary_classes[real_class]]
+            # Store the query only once per class, as it is not augmented
+            if multiple_query:
+                # Tricking to reuse the Y vector
+                query_obj   = torch.cat((query_obj,   X[index_q].unsqueeze(0)), dim=0)
+                query_class = torch.cat((query_class, Y[s_index].unsqueeze(0)), dim=0)
+        real_sample_to_augment = X[sample_indexes_x[dictionary_classes[real_class]]]
+        
+        # Use the real images only for the query
+        # if s_index in sample_indexes_x:
+        #     # If the sample is already in the support set, do not augment it
+        #     new_supp_xs = torch.cat((new_supp_xs, X[s_index].unsqueeze(0)), dim=0)
+        #     continue 
+        
+
+        new_supp_xs = torch.cat((new_supp_xs, apply_simclr_augmentation(real_sample_to_augment, class_=real_class).unsqueeze(0)), dim=0)
+    return new_supp_xs, {"query_obj": query_obj, "query_class": query_class}
 
 def extend_dimenstions_bs(arr, batch_size):
     arr_expanded = np.expand_dims(arr, axis=0)

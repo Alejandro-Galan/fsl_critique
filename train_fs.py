@@ -15,7 +15,7 @@ from models.RelationNetwork import RelationNetwork
 import datasets.config as config
 import pandas as pd
 
-from datasets.loader import load_supervised_data, convert_clustering_experiment
+from datasets.loader import load_supervised_data, convert_clustering_experiment, get_params_for_loading_datasets
 from utils.generators import supervised_data_generator
 from utils.train_utils import split_train_test, write_plot_results
 from models.FewShotModel import FewShotTrain
@@ -107,14 +107,15 @@ def run_bootstrap(
         print("Bootstraps done:", boots_done)
         boots_done = boots_done[~pd.isnull(boots_done)]
         np.testing.assert_equal(len(boots_done), int(max(boots_done)) + 1 )
-        starting_boots_iter = int(max(boots_done))
+        starting_boots_iter = int(max(boots_done)) + 1
         if accumulated_history.empty:
             accumulated_history = df.copy()
 
+    project_name = "FSL_NOODLES" #if exp != "exp3" else "FSL_NOODLES_EXP3"
     for run in range(starting_boots_iter, num_runs):
 
         run_wandb = wandb.init(
-            project="small-run-matching-networks-SSL-symbols", 
+            project=project_name, 
             group=Constants["GROUP_EXPERIMENT"],
             tags=list([str(Constants['SAMPLES_PER_CLASS']), str(ds_name), str(Constants['MODEL_TYPE'])]),
 
@@ -148,22 +149,8 @@ def run_bootstrap(
         random.seed(run)
         np.random.seed(run)
 
+        PARAMS = get_params_for_loading_datasets(src_datasets, ds_name, samples_per_class, run, Constants=Constants)
 
-        PARAMS = {'src_datasets': src_datasets, 'ds_name': ds_name,"spc": samples_per_class, "nway_test": Constants["LIMIT_N_WAY_TEST"],
-                "nway_train": Constants['LIMIT_N_WAY_TRAIN'], "boots_iter": run, "MODEL_TYPE": Constants["MODEL_TYPE"]}
-        file_stored_test_set = "utils/stored_sets/"  + PARAMS['ds_name'] + "_" + PARAMS["MODEL_TYPE"] + "/_spc_" + str(PARAMS['spc']) + "n_way_test_" + str(PARAMS['nway_test']) \
-                            + "_n_way_train_" + str(PARAMS['nway_train']) + "/_boots_iter_" + str(PARAMS['boots_iter']) + "_test_indexes.txt"
-        # file_stored_train_set = "utils/stored_sets/" + PARAMS['ds_name'] + "_boots_iter_" + str(PARAMS['boots_iter']) + "_train.txt"
-        # PARAMS['file_stored_test_set']  = file_stored_test_set
-        # PARAMS['file_stored_train_set'] = file_stored_train_set
-        PARAMS['file_stored_indexes_dict'] = file_stored_test_set
-        fs_set = "utils/stored_sets/"  + PARAMS['ds_name'] + "_" + PARAMS["MODEL_TYPE"] + "/_spc_" + str(PARAMS['spc']) + "n_way_test_" + str(PARAMS['nway_test']) \
-                            + "_n_way_train_" + str(PARAMS['nway_train']) + "/_boots_iter_" + str(PARAMS['boots_iter'])
-        PARAMS['file_stored_supp_set_X']  = fs_set + "_X_" + "_supp.npy"
-        PARAMS['file_stored_supp_set_Y']  = fs_set + "_Y_" + "_supp.npy"
-
-        os.makedirs(os.path.dirname(fs_set), exist_ok=True)
-        
         pretrained_sources = os.path.exists(path_weights_base_pretrained) if Constants["ReusePretrained"] else False
         if Constants["ALL_DATASETS"] or Constants["NoSrcDataset"]:
             pretrained_sources = True if Constants["NoSrcDataset"] else pretrained_sources
@@ -171,7 +158,7 @@ def run_bootstrap(
             # If no validation src paramenter, Xval is empty
             data_dict = load_supervised_data(ds_name=ds_name, min_occurence=min_occurence, 
                                             all_datasets=Constants["ALL_DATASETS"], pretrained_sources=pretrained_sources, boots_iter=run)
-            
+
             _, _, XTest, YTest, XSupp, YSupp, _, _ = split_train_test(
                 PARAMS=PARAMS,
                 X=data_dict["X_tgt"],
@@ -204,7 +191,12 @@ def run_bootstrap(
         if Constants["CLUSTERING"]:
             wandb.log({"CLUSTERING": Constants["CLUSTERING"], "M-labels-SRC": Constants["M-labels-SRC"]})            
             if not pretrained_sources: # Else the weights are right, could be reused
-                XTrain, YTrain = convert_clustering_experiment(XTrain, YTrain, Constants=Constants, PARAMS=PARAMS)
+                try:
+                    XTrain, YTrain = convert_clustering_experiment(XTrain, YTrain, Constants=Constants, PARAMS=PARAMS)
+                except Exception:
+                    # Remove pretrained sources
+                    pretrained_sources = False
+                    os.remove
 
 
         print(f"Dataset {ds_name} information:")
@@ -233,6 +225,14 @@ def run_bootstrap(
 
         XTrain, YTrain, XTest, YTest = filter_per_number_samples(XTrain, YTrain, XTest, YTest, samples_per_class)
 
+        exp_size = Constants["INPUT_SIZE"][list(Constants['TGT_DATASETS'].keys())[0]]
+        real_size = (XTest.shape[-2], XTest.shape[-1])
+        np.testing.assert_equal(real_size, exp_size)
+        if len(XTrain):
+            if list(Constants['DATASETS_NAMES'])[0] != "NO_SRC_DATASET":
+                exp_size = Constants["INPUT_SIZE"][list(Constants['DATASETS_NAMES'])[0]]
+                real_size = (XTrain.shape[-2], XTrain.shape[-1])
+                np.testing.assert_equal(real_size, exp_size)
 
         print(f"\tTotal number of samples: {len(YTrain) + len(YTest), len(Y_val)}")
         print(f"\tVal samples: {len(Y_val)}")
@@ -307,7 +307,8 @@ def run_bootstrap(
             #     breakpoint()
 
             api = wandb.Api()
-            run_wandb = api.run("grifa/small-run-matching-networks-SSL-symbols/" + run_wandb.id)
+            # run_wandb = api.run("grifa/small-run-matching-networks-SSL-symbols/" + run_wandb.id)
+            run_wandb = api.run("grifa/" + project_name + "/" + run_wandb.id)
 
             history = run_wandb.history()
 

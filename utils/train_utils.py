@@ -119,12 +119,12 @@ def split_train_test(PARAMS, X, Y):
     val_X, val_Y = [], []
 
     if not os.path.exists(PARAMS["file_stored_indexes_dict"]): # or not os.path.exists(PARAMS["file_stored_train_set"]):
+
         XTest, YTest = [], [] 
         supp_X, supp_Y = [], []
         indexes = {"test_1": [], "test_2": [], "supp": []}
 
         unique_ys = np.unique(Y, axis=0)
-
         # Do not shuffle to preserve the same order after loading indexes
         # np.random.shuffle(unique_ys)
         for unique_idx, unique_y in enumerate(unique_ys):
@@ -178,7 +178,16 @@ def split_train_test(PARAMS, X, Y):
     
     # First removal
     XTest_1, YTest_1 = X[test_samples_prev], Y[test_samples_prev]
-    
+
+    # if exp == "exp3":
+    limit_test_classes = max(int(Constants["TEST_SET_PERC"] * len(np.unique(Y)) ), Constants["LIMIT_N_WAY_TEST"]) + 1
+    len1 = len(np.unique(YTest_1))
+
+    if len1 > limit_test_classes:
+        os.remove(PARAMS["file_stored_indexes_dict"])
+        print("REMOVING FILE", PARAMS["file_stored_indexes_dict"])
+    np.testing.assert_equal(len1 <= limit_test_classes, True, str(len1) + "_" + str(limit_test_classes) +" Make sure Y not corrupt and Y test sets must have the same length")
+
     # After removing supp samples
     for sample, _ in enumerate(YTest_1):
         if sample not in test_samples and sample not in supp_samples:
@@ -313,3 +322,36 @@ def adjust_n_way_to_supp_set(PARAMS, supp_X, supp_Y):
 
     np.save(PARAMS["file_stored_supp_set_X"], np.array(supp_X))
     np.save(PARAMS["file_stored_supp_set_Y"], np.array(supp_Y))    
+
+## I must delete the folder to be filled
+def debug_images_and_dists(x_target, x_support_set, dists, debug_images):
+    import matplotlib.pyplot as plt
+    base_path = "DEBUG_IMAGES/" + debug_images
+    if not os.path.exists(base_path):
+        os.makedirs(base_path, exist_ok=True)
+        all_supp, all_tgt = x_support_set.reshape(-1, 3, 40, 40), x_target.reshape(-1, 3, 40, 40)
+        all_supp, all_tgt = all_supp.permute(0,2,3,1), all_tgt.permute(0,2,3,1)
+        
+        ## Only 2 examples
+        all_supp = all_supp[:10]
+        all_tgt = all_tgt[:10]  
+
+        # Save .png images
+        for i in range(len(all_supp)):
+            img = all_supp[i].cpu().detach().numpy()
+            plt.imsave(f"{base_path}support_set_image_{i}.png", img)
+
+        for i in range(len(all_tgt)):
+            img = all_tgt[i].cpu().detach().numpy()
+            plt.imsave(f"{base_path}target_image_{i}.png", img)
+
+        reduced_dists = dists[:2]
+        # Store distances in txt
+        with open(f"{base_path}distances.txt", "w") as f:
+            for i in range(len(reduced_dists)):
+                f.write(f"For batch {i}, supp (rows), querys (cols). Distances: \n{reduced_dists[i].cpu().detach().numpy()}\n")
+    
+
+
+
+    

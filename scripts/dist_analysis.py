@@ -3,9 +3,7 @@ import numpy as np
 import pandas as pd
 
 
-# Extract distances from DISTANCES folder
-root = "DISTANCES/"
-folders = os.listdir(root)
+
 
 # Read np array distances and accs
 def read_file(path):
@@ -38,13 +36,23 @@ def extract_metadata_from_file(full_path):
     if "ft_distances_over" in full_path:
         unseen_ds = full_path.split("ft_distances_over_")[1].split("as_tgt_ds_")[0]
         unseen_ds = unseen_ds.replace("_accs.npy", "")
+        
+        if unseen_ds.startswith("omniglot_SOTA"):
+            unseen_ds = "omniglot_SOTA_testSet"
+        elif unseen_ds.startswith("miniImageNet_SOTA"):
+            unseen_ds = "miniImageNet_SOTA_testSet"
+        elif unseen_ds.startswith("cifar100_SOTA"):
+            unseen_ds = "cifar100_SOTA_testSet"
+        
         domain = "OOD" 
     else:
         unseen_ds = trained_ds
         if trained_ds.startswith("omniglot_SOTA"):
-            unseen_ds = "omniglot_SOTA_trainSet"
+            unseen_ds = "omniglot_SOTA_testSet"
         elif trained_ds.startswith("miniImageNet_SOTA"):
-            unseen_ds = "miniImageNet_SOTA_trainSet"
+            unseen_ds = "miniImageNet_SOTA_testSet"
+        elif trained_ds.startswith("cifar100_SOTA"):
+            unseen_ds = "cifar100_SOTA_testSet"
         
         domain = "ID" 
 
@@ -56,9 +64,11 @@ def extract_metadata_from_file(full_path):
 def quartile_ratio(ordered_dists, normalize):
     values = ordered_dists.reshape(-1, ordered_dists.shape[2])
     
+    sum_min_values = 0
     ratios_sum, ratios_limits = [], []
     for i, query_s in enumerate(values):
         # freq, bins = np.histogram(query_s, bins=50)
+        sum_min_values += np.min(query_s)
 
         max_values = np.sum(query_s)
         if normalize:
@@ -90,7 +100,7 @@ def quartile_ratio(ordered_dists, normalize):
         
         ratios_sum.append(ratio_sum)
         ratios_limits.append(ratio_lim)
-    return np.mean(ratios_sum), np.mean(ratios_limits)
+    return np.mean(ratios_sum), np.mean(ratios_limits), sum_min_values
 
 def calculate_metrics(af_distances, af_accs, base_dists):
     # Calculate the mean difference
@@ -102,118 +112,129 @@ def calculate_metrics(af_distances, af_accs, base_dists):
     ordered_dists = np.sort(perm_dists, axis=2)
 
     # ratio      = quartile_ratio(ordered_dists, normalize=False)
-    norm_ratio_sum, norm_ratio_limits = quartile_ratio(ordered_dists, normalize=True)
-    
+    norm_ratio_sum, norm_ratio_limits, sum_min_values = quartile_ratio(ordered_dists, normalize=True)
+
     # Calculate the accuracy
     acc = np.mean(af_accs)
-    
-    return {"mean_diff": mean_diff, "norm_ratio_sum": norm_ratio_sum, "norm_ratio_limits": norm_ratio_limits, "acc": acc}
+
+    return {"mean_diff": mean_diff, "norm_ratio_sum": norm_ratio_sum, "norm_ratio_limits": norm_ratio_limits, "acc": acc, "sum_min_values": sum_min_values}
 
 def bt_suffix(bt_epoch):
     return  "_bt_" + str(bt_epoch)
 
-af_sufix = "_after_ft_distances"
+def main(sufix):
+    # Extract distances from DISTANCES folder
+    root = "DISTANCES/" + sufix + "/"
+    folders = os.listdir(root)
+    
+    af_sufix = "_after_ft_distances"
 
-df = pd.DataFrame()
-for folder in folders:
+    df = pd.DataFrame()
+    for folder in folders:
 
-    folder_path = os.path.join(root, folder)
-    if os.path.isdir(folder_path):
-        print("Processing folder:", folder)
-        files = os.listdir(folder_path)
-        metadatas = {}
-        boots_iters = []
-        for file in files:
-            file_path = os.path.join(folder_path, file)
-            metadata = extract_metadata_from_file(file_path)
-            if file.endswith("accs.npy"):
-                # Skip accuracy files
-                continue
-            if file.startswith("3_ft_distances") or file.startswith("_after_3_ft_distances"):
-                # Remove file
-                print("Removing old file:", file_path)
-                os.remove(file_path)
-                continue
+        folder_path = os.path.join(root, folder)
+        if os.path.isdir(folder_path):
+            print("Processing folder:", folder)
+            files = os.listdir(folder_path)
+            metadatas = {}
+            boots_iters = []
+            for file in files:
+                file_path = os.path.join(folder_path, file)
+                metadata = extract_metadata_from_file(file_path)
+                if file.endswith("accs.npy"):
+                    # Skip accuracy files
+                    continue
+                if file.startswith("3_ft_distances") or file.startswith("_after_3_ft_distances"):
+                    # Remove file
+                    print("Removing old file:", file_path)
+                    os.remove(file_path)
+                    continue
+                metadata["bt_iter"] = int(file_path.split("bt_")[-1].split(".npy")[0])
+                if metadata["bt_iter"] not in boots_iters:
+                    boots_iters.append(metadata["bt_iter"])
+
+                if file.startswith(af_sufix):
+                    # print(file_path)
+                    af_distances, af_accs = read_file(file_path)      
+                    metadatas["base" + bt_suffix(metadata["bt_iter"])] = metadata
+                elif file.startswith("ft_distances_over"):
+                    af_distances, af_accs = read_file(file_path)       
+                    metadatas[metadata['unseen_ds'] + bt_suffix(metadata["bt_iter"])] = metadata
+                else:
+                    # print("Skipping file:", file_path)
+                    continue
+                metadata["af_distances"] = af_distances
+                metadata["af_accs"] = af_accs
+
+            if "base_bt_0" not in metadatas:
+                print("Empty folder:", folder_path)
+                try:
+                    os.rmdir(folder_path)  
+                except:
+                    print("Could not remove folder:", folder_path)
+                continue 
             
-            metadata["bt_iter"] = int(file_path.split("bt_")[-1].split(".npy")[0])
-            if metadata["bt_iter"] not in boots_iters:
-                boots_iters.append(metadata["bt_iter"])
-
-            if file.startswith(af_sufix):
-                # print(file_path)
-                af_distances, af_accs = read_file(file_path)      
-                metadatas["base" + bt_suffix(metadata["bt_iter"])] = metadata
-            elif file.startswith("ft_distances_over"):
-                af_distances, af_accs = read_file(file_path)            
-                metadatas[metadata['unseen_ds'] + bt_suffix(metadata["bt_iter"])] = metadata
-            else:
-                # print("Skipping file:", file_path)
-                continue
-            metadata["af_distances"] = af_distances
-            metadata["af_accs"] = af_accs
-
-        if "base_bt_0" not in metadatas:
-            print("Empty folder:", folder_path)
-            try:
-                os.rmdir(folder_path)  
-            except:
-                print("Could not remove folder:", folder_path)
-            continue 
-        
-        for bt_ep in boots_iters:
-            
-            # filter metadata with elements finishing with bt_epoch only 
-            bt_suffix_str = bt_suffix(bt_ep)
-            metadatas_ft = {k: v for k, v in metadatas.items() if k.endswith(bt_suffix_str)}
-
-            base_dists = metadatas_ft["base" + bt_suffix(bt_ep)]["af_distances"]
-
-            # for name, met in metadatas_ft.items():
-            for name, met in metadatas_ft.items():
+            for bt_ep in boots_iters:
                 
-                # # Forbidden cases
-                # if met["trained_ds"] == "omniglot_SOTA_trainvalSet" or met["trained_ds"] == "omniglot_SOTA_trainSet" or met["trained_ds"] == "miniImageNet_SOTA_trainSet":
-                #     continue
+                # filter metadata with elements finishing with bt_epoch only 
+                bt_suffix_str = bt_suffix(bt_ep)
+                metadatas_ft = {k: v for k, v in metadatas.items() if k.endswith(bt_suffix_str)}
 
-                # if met["unseen_ds"] == "omniglot_SOTA_testSet":
-                #     continue
+                base_dists = metadatas_ft["base" + bt_suffix(bt_ep)]["af_distances"]
 
+                # for name, met in metadatas_ft.items():
+                for name, met in metadatas_ft.items():
+                    
+                    # # Forbidden cases
+                    # if met["trained_ds"] == "omniglot_SOTA_trainvalSet" or met["trained_ds"] == "omniglot_SOTA_trainSet" or met["trained_ds"] == "miniImageNet_SOTA_trainSet":
+                    #     continue
 
-                print("trained_ds:", met["trained_ds"], "unseen_ds:", name, "\n\tspc:", met["spc"], "nway:", met["nway"])
-                metrics = calculate_metrics(met["af_distances"], met["af_accs"], base_dists)
-                
-                # Add new row to the DataFrame
-                new_row = {
-                    "unseen_ds": met["unseen_ds"],
-                    "spc": met["spc"],
-                    "model": met["model"],
-                    "nway": met["nway"],
-                    "trained_ds": met["trained_ds"],
-                    "mean_diff": metrics["mean_diff"],
-                    "acc": met["af_accs"][0],
-                    "dis_mean": np.mean(met["af_distances"]),
-                    "norm_ratio_sum": metrics["norm_ratio_sum"],
-                    "norm_ratio_limits": metrics["norm_ratio_limits"],
-                    "domain": met["domain"],
-                    "acc_std": met["af_accs"][1],
-                    "bt_iter": met["bt_iter"]
+                    # if met["unseen_ds"] == "omniglot_SOTA_testSet":
+                    #     continue
 
-                }
+                    print("trained_ds:", met["trained_ds"], "unseen_ds:", name, "\n\tspc:", met["spc"], "nway:", met["nway"])
+                    if met["unseen_ds"].startswith(met["trained_ds"]) and met["domain"] == "OOD":
+                        print("pillada")
+                        continue
+                    
+                    metrics = calculate_metrics(met["af_distances"], met["af_accs"], base_dists)
+                    
+                    # Add new row to the DataFrame
+                    new_row = {
+                        "unseen_ds": met["unseen_ds"],
+                        "spc": met["spc"],
+                        "model": met["model"],
+                        "nway": met["nway"],
+                        "trained_ds": met["trained_ds"],
+                        "mean_diff": metrics["mean_diff"],
+                        "acc": met["af_accs"][0],
+                        "dis_mean": np.mean(met["af_distances"]),
+                        "norm_ratio_sum": metrics["norm_ratio_sum"],
+                        "norm_ratio_limits": metrics["norm_ratio_limits"],
+                        "domain": met["domain"],
+                        "acc_std": met["af_accs"][1],
+                        "bt_iter": met["bt_iter"],
+                        "sum_min_values": metrics["sum_min_values"]
 
-                # new_row = {
-                #     "unseen_ds": met["unseen_ds"],
-                #     "spc": met["spc"],
-                #     "model": met["model"],
-                #     "nway": met["nway"],
-                #     "trained_ds": met["trained_ds"],
-                #     "acc": met["af_accs"][0],
-                #     "domain": met["domain"],
+                    }
 
-                # }
-                
-                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                    # new_row = {
+                    #     "unseen_ds": met["unseen_ds"],
+                    #     "spc": met["spc"],
+                    #     "model": met["model"],
+                    #     "nway": met["nway"],
+                    #     "trained_ds": met["trained_ds"],
+                    #     "acc": met["af_accs"][0],
+                    #     "domain": met["domain"],
 
-# Save the DataFrame to a CSV file
-df.to_csv("distances_analysis.csv", index=False)
-print(df)
-# breakpoint()
+                    # }
+                    
+                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+    # Save the DataFrame to a CSV file
+    df.to_csv("distances_analysis_" + sufix + ".csv", index=False)
+    print(df)
+    # breakpoint()
+
+main("RelationNetwork")
+# main("PrototypicalNetwork")
