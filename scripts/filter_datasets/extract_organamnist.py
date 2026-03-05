@@ -23,6 +23,7 @@ for set in sets:
 output_dir = 'datasets/organamnist/'
 output_dir += "data/"
 
+
 os.system("rm -r " + output_dir)
 os.makedirs(output_dir, exist_ok=True)
 for i, label in enumerate(all_labels):

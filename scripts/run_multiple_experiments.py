@@ -61,18 +61,18 @@ def filter_n_way_datasets(allMoreParams, source_datasets, target_datasets):
             to_cluster_kmeans = True
     for moreParams in allMoreParams:
         if "LIMIT_N_WAY_TRAIN" in moreParams and moreParams["LIMIT_N_WAY_TRAIN"] > 18:
-            banned = [Const_c.DATASETS.EGYPTIAN.value, "miniImageNet_SOTA_trainSet", 
-                      Const_c.DATASETS.BREAKHIS.value, "cifar100_SOTA_trainSet",
-                      Const_c.DATASETS.ORGANAMNIST.value]
+            banned = [Const_c.DATASETS.EGYPTIAN.value, 
+                      Const_c.DATASETS.BREAKHIS.value, 
+                      Const_c.DATASETS.ORGANAMNIST.value] # "miniImageNet_SOTA_trainSet", "cifar100_SOTA_trainSet",
             if to_cluster_kmeans:
-                banned = ["miniImageNet_SOTA_trainSet", "cifar100_SOTA_trainSet"]
+                banned = [] #["miniImageNet_SOTA_trainSet", "cifar100_SOTA_trainSet"]
             for b in banned:
                 if b in source_datasets:
                     source_datasets.remove(b)
         if "LIMIT_N_WAY_TEST" in moreParams and moreParams["LIMIT_N_WAY_TEST"] > 18:
             banned = [Const_c.DATASETS.CAPITAN.value, Const_c.DATASETS.EGYPTIAN.value, 
-                    "miniImageNet_SOTA_testSet", Const_c.DATASETS.BREAKHIS.value,
-                    "cifar100_SOTA_testSet", Const_c.DATASETS.ORGANAMNIST.value]
+                     Const_c.DATASETS.BREAKHIS.value,
+                     Const_c.DATASETS.ORGANAMNIST.value] #"cifar100_SOTA_testSet","miniImageNet_SOTA_testSet",
             for b in banned:
                 if b in target_datasets:
                     target_datasets.remove(b)
@@ -81,10 +81,9 @@ def filter_n_way_datasets(allMoreParams, source_datasets, target_datasets):
         if "SAMPLES_PER_CLASS" in moreParams and 10 in moreParams["SAMPLES_PER_CLASS"]:
             if len(moreParams["SAMPLES_PER_CLASS"]) > 1:
                 print("WARNING: Removing some datasets because 10 spc is in the list")
-            banned = ["omniglot_SOTA_trainSet", "omniglot_SOTA_testSet",
-                      "miniImageNet_SOTA_trainSet", "miniImageNet_SOTA_testSet", 
-                      Const_c.DATASETS.BREAKHIS.value, 
-                      "cifar100_SOTA_trainSet", "cifar100_SOTA_testSet"]
+            banned = [Const_c.DATASETS.BREAKHIS.value]  #"omniglot_SOTA_trainSet", "omniglot_SOTA_testSet",
+                                                        #"miniImageNet_SOTA_trainSet", "miniImageNet_SOTA_testSet", 
+                                                        #"cifar100_SOTA_trainSet", "cifar100_SOTA_testSet"]
             for b in banned:
                 if b in source_datasets:
                     source_datasets.remove(b)
@@ -264,12 +263,12 @@ def exp3_4__run_source_permutation_experiments(moreParams=[], exp_name="", group
     os.makedirs(path_exp, exist_ok=True)
 
 
-    target_datasets = ["omniglot_SOTA_testSet", Const_c.DATASETS.CAPITAN.value, Const_c.DATASETS.EGYPTIAN.value, Const_c.DATASETS.TKH.value, Const_c.DATASETS.GREEK.value, 
-                       "miniImageNet_SOTA_testSet", "cifar100_SOTA_testSet", Const_c.DATASETS.ORGANAMNIST.value] # Const_c.DATASETS.BREAKHIS.value,
+    target_datasets = ["miniImageNet_SOTA_testSet", "omniglot_SOTA_testSet", Const_c.DATASETS.CAPITAN.value, Const_c.DATASETS.EGYPTIAN.value, Const_c.DATASETS.TKH.value, Const_c.DATASETS.GREEK.value, 
+                        "cifar100_SOTA_testSet", Const_c.DATASETS.ORGANAMNIST.value] # Const_c.DATASETS.BREAKHIS.value,
 
     ################## DEBUG ##################
-    # if group_exp_name == "exp3":
-    #     target_datasets = [ Const_c.DATASETS.TKH.value ] 
+    # if group_exp_name == "exp4":
+    #     target_datasets = [ "miniImageNet_SOTA_testSet" ] 
     ###########################################
 
     source_datasets, target_datasets = filter_n_way_datasets(moreParams, {}, target_datasets)
@@ -377,7 +376,7 @@ if __name__ == "__main__":
         ## Exp 3. No source training  only Fine tuning with validation
         print("Running experiment 3: No source training only ft")
         # if "PrototypicalNetwork" in MODEL_TS:
-        #     BOOTSTRAP_ITERS = 10
+        #     BOOTSTRAP_ITERS = 10 
 
         use_validation_params = [{"NoSrcDataset": True}, {"epochsFineTuning": 3}, {"BOOTSTRAP_ITERS": BOOTSTRAP_ITERS}, {"LIMIT_N_WAY_TRAIN": NWAY}, {"LIMIT_N_WAY_TEST": NWAY}, {"SAMPLES_PER_CLASS": SPC_OW}, {"MODEL_TYPE": MODEL_TS}]
 

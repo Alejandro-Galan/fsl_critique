@@ -25,7 +25,6 @@ class FewShotTrain():
                            X_val=None, Y_val=None):
 
 
-
         encoder.train()
         total_c_loss = 0.0
         total_accuracy = 0.0
@@ -940,7 +939,7 @@ def augment_support_only(supp_index, supp_classes, X, Y, multiple_query=False):
 
     new_supp_xs = torch.tensor([])
     dictionary_classes = {}
-    # TODO reuse the supp_Y to not change it
+
     # Times to augment new x images. Iterate through real array
     for s_index in supp_index:
         real_class  = Y[s_index].item()

@@ -41,21 +41,21 @@ class Const_c():
         debug_modifying = False
         if "6" in exp_num:  # or "1" in exp_num: 
             params['SAMPLES_PER_CLASS'] = 1 #1 #5
-            params['MODEL_TYPE'] = 'RelationNetwork' #'PrototypicalNetwork' #'RelationNetwork'
-            params['DATASETS_NAMES'] =  {'NO_SRC_DATASET': {}} #{'NO_SRC_DATASET': {}} #{"omniglot_SOTA_trainSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_trainSet": {}}
-            params['TGT_DATASETS']   =  {Const_c.DATASETS.EGYPTIAN.value: {}} #{"omniglot_SOTA_testSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_testSet": {}}
-            params["EPISODES"] = 111 #2000
-            params["BOOTSTRAP_ITERS"] = 1
+            params['MODEL_TYPE'] = 'PrototypicalNetwork' #'RelationNetwork' #'PrototypicalNetwork' #'RelationNetwork'
+            params['DATASETS_NAMES'] =  {'cifar100_SOTA_trainSet': {}} #{'NO_SRC_DATASET': {}} #{"omniglot_SOTA_trainSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_trainSet": {}}
+            params['TGT_DATASETS']   =  {"cifar100_SOTA_testSet": {}} #{"omniglot_SOTA_testSet": {}} #{Const_c.DATASETS.CAPITAN.value: {}} # {"miniImageNet_SOTA_testSet": {}}
+            params["EPISODES"] = 4000 #2000
+            params["BOOTSTRAP_ITERS"] = 5
             params["epochsFineTuning"] = 3 #3
             params["BATCH_SIZE"] = 16 #16
-            params["LIMIT_N_WAY_TRAIN"] = 5
-            params["LIMIT_N_WAY_TEST"] = 5
+            params["LIMIT_N_WAY_TRAIN"] = 20
+            params["LIMIT_N_WAY_TEST"] = 20
             params["group_experiment"] = "testing6" 
 
             
             params['OVERWRITE_LOGS'] = True
             params["ReusePretrained"] = True
-            params["NoSrcDataset"] = True
+            params["NoSrcDataset"] = False
             params["DEBUG_IMAGES"] = True
             # params["ALL_DATASETS"] = False # exp4
 

@@ -15,7 +15,7 @@ from models.RelationNetwork import RelationNetwork
 import datasets.config as config
 import pandas as pd
 
-from datasets.loader import load_supervised_data, convert_clustering_experiment, get_params_for_loading_datasets
+from datasets.loader import load_supervised_data, convert_clustering_experiment, get_params_for_loading_datasets, check_SOTA_case
 from utils.generators import supervised_data_generator
 from utils.train_utils import split_train_test, write_plot_results
 from models.FewShotModel import FewShotTrain
@@ -174,12 +174,20 @@ def run_bootstrap(
             
         else:
             data_dict = load_supervised_data(ds_name=ds_name, min_occurence=min_occurence, boots_iter=run)
-
-            XTrain, YTrain, XTest, YTest, XSupp, YSupp, XVal, YVal = split_train_test(
-                PARAMS=PARAMS,
-                X=data_dict["X_tgt"], 
-                Y=data_dict["Y_tgt"],
-            )
+            
+            if check_SOTA_case(ds_name, Constants["DATASETS_NAMES"]): 
+                XTrain, YTrain = data_dict["X_src"], data_dict["Y_src"]
+                _, _, XTest, YTest, XSupp, YSupp, _, _ = split_train_test(
+                                                            PARAMS=PARAMS,
+                                                            X=data_dict["X_tgt"],
+                                                            Y=data_dict["Y_tgt"],
+                                                        )                   
+            else:
+                XTrain, YTrain, XTest, YTest, XSupp, YSupp, XVal, YVal = split_train_test(
+                    PARAMS=PARAMS,
+                    X=data_dict["X_tgt"], 
+                    Y=data_dict["Y_tgt"],
+                )
 
             X_val, Y_val, w2i = data_dict["X_val"], data_dict["Y_val"], data_dict["w2i"]
 

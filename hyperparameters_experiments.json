@@ -1,23 +1,23 @@
 {
     "NWAY": {
         "1": 5,
-        "3": 5,
+        "3": 20,
         "4": 5,
         "10": 20,
         "13": 5
     },
     "SPC_OW": {
-        "1":  [ 1, 5 ],
+        "1":  [ 10 ],
         "3":  [ 1, 5 ],
         "4":  [ 1, 5 ],
         "10": [ 10 ],
-        "13": [ 1, 5 ]
+        "13": [ 10 ]
     },
     "MODEL_TS": {
         "1": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"],
         "3": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"],
         "4": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"],
-        "10": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"],
+        "10": ["RelationNetwork"],
         "13": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"]
     },
     "BOOTSTRAP_ITERS": {

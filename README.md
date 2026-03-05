@@ -70,34 +70,6 @@ python3 scripts/complementary_comp/main_complementary_comparison_methods.py
 
 ## Citations
 
-```bibtex
-@article{alfaro2023few,
-  title     = {{Few-Shot Symbol Classification via Self-Supervised Learning and Nearest Neighbor}},
-  author    = {Alfaro-Contreras, Mar{\'\i}a and R{\'\i}os-Vila, Antonio and Valero-Mas, Jose J and Calvo-Zaragoza, Jorge},
-  journal   = {{Pattern Recognition Letters}},
-  volume    = {167},
-  pages     = {1--8},
-  year      = {2023},
-  publisher = {Elsevier},
-  doi       = {10.1016/j.patrec.2023.01.014},
-}
-
-@inproceedings{rios2022few,
-  title     =   {{Few-Shot Music Symbol Classification via Self-Supervised Learning and Nearest Neighbor}},
-  author    =   {R{\'\i}os-Vila, Antonio and Alfaro-Contreras, Mar{\'\i}a and Valero-Mas, Jose J and Calvo-Zaragoza, Jorge},
-  booktitle =   {{Proceedings of the 3rd International Workshop Pattern Recognition for Cultural Heritage}},
-  pages     =   {93--107},
-  year      =   {2022},
-  publisher =   {Springer},
-  address   =   {Montréal, Canada},
-  month     =   aug,
-  doi       =   {10.1007/978-3-031-37731-0_8},
-}
-```
-
-## Acknowledgments
-
-This work is part of the I+D+i PID2020-118447RA-I00 ([MultiScore](https://sites.google.com/view/multiscore-project)) project, funded by MCIN/AEI/10.13039/501100011033. Computational resources were provided by the Valencian Government and FEDER funding through IDIFEDER/2020/003.
 
 ## License
 This work is under a [MIT](LICENSE) license.
