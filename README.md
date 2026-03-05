@@ -51,6 +51,15 @@ To execute an experiment, please execute this line
 python3 ./scripts/auto_paralel_exps.sh <experiment_number> <simultaneous_executions>
 ```
 
+##### Correspondences between experiments and its id
+| Experiment | Paper name                                    |   |
+|------------|-----------------------------------------------|---|
+| 1          | Out of domain pre-trained, Supervised         |   |
+| 3          | No pre-train use (Strict Baseline)            |   |
+| 4          | In domain pre-train, Supervised               |   |
+| 10         | Clustering out of domain, Unsupervised        |   |
+| 13         | Data Augmentation out of domain, Unsupervised |   |
+
 There are also a few relevant scripts. 
 
 #### Extract the logs into simpler tables:
