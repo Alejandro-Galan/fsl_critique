@@ -45,7 +45,10 @@ In that function, all the datasets are loaded without partition sets.
 
 ## How To Use
 
-To execute an experiment, please execute this line
+All the needed packages can be found at "docker/Dockerfile"
+
+
+To execute an experiment, please execute this line:
 
 ```
 python3 ./scripts/auto_paralel_exps.sh <experiment_number> <simultaneous_executions>
