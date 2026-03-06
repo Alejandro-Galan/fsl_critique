@@ -77,6 +77,27 @@ python3 logs_csv/filter_logs_csv.py
 python3 scripts/complementary_comp/main_complementary_comparison_methods.py
 ```
 
+## Reproducibility
+If you want to try our code and check that your results seem correct, compare to the following table for the supervised ood-pt experiment.
+
+|  Dataset, N-way, K-shot  |   wit IDA |   no IDA |
+|:------------------|--------------:|---------------------:|
+| ('CAP.', 5, 1)    |     0.58575   |            0.52608   |
+| ('CAP.', 5, 5)    |     0.849527  |            0.692157  |
+| ('CAP.', 5, 10)   |     0.915925  |            0.765815  |
+| ('Greek', 5, 1)   |     0.694944  |            0.645408  |
+| ('Greek', 5, 5)   |     0.883273  |            0.824545  |
+| ('Greek', 5, 10)  |     0.9111    |            0.854696  |
+| ('Greek', 20, 1)  |     0.54979   |            0.459218  |
+| ('Greek', 20, 5)  |     0.805293  |            0.675706  |
+| ('Greek', 20, 10) |     0.845389  |            0.751328  |
+| ('Omni.', 5, 1)   |     0.656689  |            0.621083  |
+| ('Omni.', 5, 5)   |     0.884959  |            0.842189  |
+| ('Omni.', 5, 10)  |     0.956662  |            0.900265  |
+| ('Omni.', 20, 1)  |     0.483369  |            0.444266  |
+| ('Omni.', 20, 5)  |     0.81198   |            0.709403  |
+| ('Omni.', 20, 10) |     0.934959  |            0.824712  |
+
 
 
 
