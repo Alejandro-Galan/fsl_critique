@@ -31,8 +31,7 @@ def extract_metadata_from_file(full_path):
         nway = int(match.group("nway"))
         # print(f"trained_ds: {trained_ds}, spc: {spc}, model: {model}, nway: {nway}")
     else:
-        print("Formato no reconocido.", full_path)    
-        breakpoint()
+        raise ValueError(f"Formato no reconocido: {full_path}")
     if "ft_distances_over" in full_path:
         unseen_ds = full_path.split("ft_distances_over_")[1].split("as_tgt_ds_")[0]
         unseen_ds = unseen_ds.replace("_accs.npy", "")

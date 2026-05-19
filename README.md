@@ -48,10 +48,15 @@ In that function, all the datasets are loaded without partition sets.
 All the needed packages can be found at "docker/Dockerfile"
 
 
-To execute an experiment, please execute this line:
+To execute one experiment, please execute this line:
 
 ```
-python3 ./scripts/auto_paralel_exps.sh <experiment_number> <simultaneous_executions>
+./scripts/execute_experiment.sh <experiment_number>
+```
+
+The hiperparameters can be changed in that script and in 
+```
+hyperparameters_experiments.json
 ```
 
 ##### Correspondences between experiments and its id

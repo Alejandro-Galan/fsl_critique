@@ -32,6 +32,7 @@ class PrototypicalNetwork(nn.Module):
         x = self.encoder(x)
         return x.view(x.size(0), -1)
     
+    @staticmethod
     def get_outputs(x_target, y_target, x_support_set, y_support_set, encoder):
 
         if len(x_target.shape) < 5:
@@ -46,8 +47,8 @@ class PrototypicalNetwork(nn.Module):
         # For each item
         outputs_x = []
         for i in range(inputs_x.shape[1]):
-            outputs_x.append(encoder(inputs_x[:,i,:,:,:]))
+            outputs_x.append(encoder(inputs_x[:, i, :, :, :]))
 
         # inputs_y = inputs_y.squeeze(2).t().unsqueeze(2)
-        return torch.stack(outputs_x,dim=1), inputs_y
+        return torch.stack(outputs_x, dim=1), inputs_y
 

@@ -409,8 +409,6 @@ class Const_c():
 
     BASE_PARAMETERS["ALL_DATASETS_BASE"] = ["TKH", "b-59-850", "Egyptian", "Greek"]
 
-    BASE_PARAMETERS["DEACTIVATE_WANDB"] = False #False
-
 
     BASE_PARAMETERS["SOTA_DATASETS"] = ["omniglot", "miniImageNet", "omniglot_SOTA_testSet", "miniImageNet_SOTA_testSet",
                     "omniglot_SOTA_trainSet", "miniImageNet_SOTA_trainSet", "cifar100_SOTA_trainSet", "cifar100_SOTA_testSet",

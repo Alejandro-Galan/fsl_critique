@@ -308,10 +308,10 @@ def undesired_to_print_cases(df, path_file):
         if clusts == "KMEANS" or clusts == "CONSTRAINED-KMEANS":
             df_ = df[~df["CLUSTERING"].isna()]
             if len(df_["CLUSTERING"].unique()) != 1:
-                breakpoint()
+                raise ValueError("Expected exactly one non-null CLUSTERING value.")
             #remove nan values from df["CLUSTERING"]
             if len(df_["CLUSTERING"].unique()) != 1:
-                breakpoint()
+                raise ValueError("Expected exactly one non-null CLUSTERING value.")
             np.testing.assert_equal(len(df_["CLUSTERING"].unique()), 1)
             to_cluster_kmeans = True
 
@@ -470,8 +470,9 @@ for root, folders, files in os.walk(logs_base_path):
                     exp_tables[metadata['exp_name']] = pd.concat([exp_tables[metadata['exp_name']], df])
 
                 if len(df.columns) != len(exp_tables[metadata['exp_name']].columns):
-                    print(df.columns)
-                    breakpoint()
+                    raise ValueError(
+                        f"Column mismatch while merging {metadata['exp_name']}: {list(df.columns)}"
+                    )
 
                 exp_tables[metadata['exp_name']] = reduce_redundancy(exp_tables[metadata['exp_name']], exp_num)
                 # if len(exp_tables[metadata['exp_name']]["_timestamp"].unique()) != len(exp_tables[metadata['exp_name']]):

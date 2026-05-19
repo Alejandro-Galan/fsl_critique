@@ -137,26 +137,65 @@ class RelationNetwork(nn.Module):
 
 
 
+    @staticmethod
+    def _as_label_vector(labels):
+        """Return labels as a flat integer vector.
+
+        RelationNetwork builds one prototype per support class. The support labels
+        must therefore be class ids, not one-hot matrices.
+        """
+        if labels.dim() > 1:
+            labels = labels.argmax(dim=-1)
+        return labels.reshape(-1).long()
+
+    @staticmethod
+    def _remap_to_episode_labels(support_labels, query_labels):
+        """Map arbitrary dataset labels to contiguous episode labels 0..N-1."""
+        support_labels = RelationNetwork._as_label_vector(support_labels)
+        query_labels = RelationNetwork._as_label_vector(query_labels)
+
+        unique_labels = torch.unique(support_labels, sorted=True)
+        remapped_support = torch.empty_like(support_labels)
+        remapped_query = torch.empty_like(query_labels)
+
+        for new_label, old_label in enumerate(unique_labels):
+            remapped_support[support_labels == old_label] = new_label
+            remapped_query[query_labels == old_label] = new_label
+
+        unknown_query = ~torch.isin(query_labels, unique_labels)
+        if torch.any(unknown_query):
+            raise ValueError(
+                "Query labels contain classes that are not present in the support set: "
+                f"{query_labels[unknown_query].detach().cpu().tolist()}"
+            )
+
+        return remapped_support, remapped_query
+
     ## As this is for RelationNetworks, we just element-wise sum embeddings of each class
-    def compute_prototypes(self, support_features, support_labels):
+    def compute_prototypes(self, support_features, support_labels, class_num=None):
         """
-        Compute class prototypes from support features and labels
-        Args:
-            support_features: for each instance in the support set, its feature vector
-            support_labels: for each instance in the support set, its label
-
-        Returns:
-            for each label of the support set, the sum feature vector of instances with this label
+        Compute class prototypes from support features and integer labels.
         """
+        support_labels = self._as_label_vector(support_labels).to(support_features.device)
+        n_way = int(class_num or torch.unique(support_labels).numel())
 
-        n_way = len(torch.unique(support_labels))
-        
-        return torch.cat(
-            [
-                support_features[torch.nonzero(support_labels == label)].sum(0)
-                for label in range(n_way)
-            ]
-        )
+        if support_labels.numel() != support_features.shape[0]:
+            raise ValueError(
+                "Support labels and support features have incompatible sizes: "
+                f"labels={support_labels.numel()}, features={support_features.shape[0]}"
+            )
+
+        prototypes = []
+        for label in range(n_way):
+            mask = support_labels == label
+            if not torch.any(mask):
+                raise ValueError(
+                    f"No support samples found for episode label {label}. "
+                    f"Support labels: {support_labels.detach().cpu().tolist()}"
+                )
+            prototypes.append(support_features[mask].sum(dim=0, keepdim=True))
+
+        return torch.cat(prototypes, dim=0)
 
 
 
@@ -179,10 +218,11 @@ class RelationNetwork(nn.Module):
             sample_images, query_images = sample_images_[b], query_images_[b] 
             sample_images = sample_images.view(-1, sample_images.shape[1], sample_images.shape[2], sample_images.shape[3])    # [CLASS_NUM*SPC, 3, 28, 28]
             query_images  = query_images.view(-1, query_images.shape[1], query_images.shape[2], query_images.shape[3])        # [B*CLASS_NUM, 3, 28, 28]
-            sample_labels, query_labels  = sample_labels_[b], query_labels_[b]
-            
+            sample_labels, query_labels = sample_labels_[b], query_labels_[b]
+            sample_labels, query_labels = self._remap_to_episode_labels(sample_labels, query_labels)
+            sample_labels = sample_labels.to(sample_images.device)
+            query_labels = query_labels.to(query_images.device)
 
-            
             #### Interp
             # if not self.ds_name.startswith("omniglot"): # Not anymore, as the sizes have been forced to 40x40
             # if sample_images.shape[3] != 84 and sample_images.shape[3] != 28:
@@ -196,7 +236,11 @@ class RelationNetwork(nn.Module):
 
             # sample_features = sample_features.view(CLASS_NUM,SAMPLE_NUM_PER_CLASS,FEATURE_DIM,W,H) # [CLASS_NUM, SPC, 64, 5, 5]
             # Join features of each sample class per batch
-            sample_features = self.compute_prototypes(sample_features.view(CLASS_NUM*SAMPLE_NUM_PER_CLASS, FEATURE_DIM,W,H), sample_labels.view(-1))
+            sample_features = self.compute_prototypes(
+                sample_features.view(CLASS_NUM * SAMPLE_NUM_PER_CLASS, FEATURE_DIM, W, H),
+                sample_labels,
+                class_num=CLASS_NUM,
+            )
             # sample_features = torch.sum(sample_features,1).squeeze(1).view(CLASS_NUM, FEATURE_DIM,5,5)   # Remove SPC [CLASS_NUM, 64, 5, 5]
 
 
@@ -219,8 +263,8 @@ class RelationNetwork(nn.Module):
             relation_pairs = relation_pairs.view(-1, FEATURE_DIM * 2, *query_features.shape[2:]) # [CLASS_NUM, 128, 5, 5]
             try:
                 relations = self.relation_network(relation_pairs).view(-1, sample_features.shape[0])       # [CLASS_NUM , CLASS_NUM]
-            except:
-                breakpoint()
+            except RuntimeError as exc:
+                raise RuntimeError("Relation network forward pass failed.") from exc
 
             # Preds
             _, predicted_labels = torch.max(relations, dim=1)  # Índices de muestras más similares [ALLQ]
@@ -233,7 +277,16 @@ class RelationNetwork(nn.Module):
 
             # Loss MSE
             mse = nn.MSELoss().cuda()
-            one_hot_labels = Variable(torch.zeros(B*CLASS_NUM, CLASS_NUM).cuda().scatter_(1, query_labels.view(-1,1), 1)).cuda()
+            query_labels_flat = query_labels.view(-1).long().cuda()
+            if query_labels_flat.min().item() < 0 or query_labels_flat.max().item() >= CLASS_NUM:
+                raise ValueError(
+                    "Query labels out of range for RelationNetwork episode: "
+                    f"min={query_labels_flat.min().item()}, max={query_labels_flat.max().item()}, "
+                    f"CLASS_NUM={CLASS_NUM}, labels={query_labels_flat.detach().cpu().tolist()}"
+                )
+            one_hot_labels = Variable(
+                torch.zeros(B * CLASS_NUM, CLASS_NUM).cuda().scatter_(1, query_labels_flat.view(-1, 1), 1)
+            ).cuda()
 
             loss = mse(relations,one_hot_labels)
 

@@ -240,10 +240,12 @@ def parse_files_no_txt_SOTA(img_filenames: list) -> Tuple[list, list]:
     for image_path in img_filenames:
         
         image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if image is None:
+            continue
         try:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        except:
-            breakpoint()
+        except cv2.error as exc:
+            raise ValueError(f"Could not convert image to RGB: {image_path}") from exc
         if image is not None:
             bboxes.append(preprocess_image(image))
 

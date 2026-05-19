@@ -181,22 +181,13 @@ class PrototypicalLoss(Module):
 
 
 def euclidean_dist(x, y):
-    '''
-    Compute euclidean distance between two tensors
-    '''
-    # x: N x D
-    # y: M x D
-    n = x.size(0)
-    m = y.size(0)
-    d = x.size(1)
+    """Compute squared Euclidean distances between rows of two tensors."""
+    if x.dim() != 2 or y.dim() != 2:
+        raise ValueError("x and y must be two-dimensional tensors.")
+    if x.size(1) != y.size(1):
+        raise ValueError("x and y must have the same feature dimension.")
 
-    if d != y.size(1):
-        raise Exception
-
-    x = x.unsqueeze(1).expand(n, m, d)
-    y = y.unsqueeze(0).expand(n, m, d)
-
-    return torch.pow(x - y, 2).sum(2)
+    return (x.unsqueeze(1) - y.unsqueeze(0)).pow(2).sum(dim=2)
 
 def proto_loss_batch(input_cpu, target_cpu, n_support):
 
@@ -214,9 +205,11 @@ def proto_loss_batch(input_cpu, target_cpu, n_support):
     prototypes = torch.stack([input_cpu[idx_list].mean(0) for idx_list in support_idxs])
     # FIXME when torch will support where as np
     try:
-        query_idxs = torch.stack(list(map(lambda c: target_cpu.eq(c).nonzero()[n_support:, 0], classes))).view(-1)
-    except:
-        breakpoint()
+        query_idxs = torch.stack(
+            [target_cpu.eq(c).nonzero()[n_support:, 0] for c in classes]
+        ).view(-1)
+    except RuntimeError as exc:
+        raise ValueError("Could not build query indexes for prototypical loss.") from exc
 
     query_samples = input_cpu[query_idxs]
     dists = euclidean_dist(query_samples, prototypes)

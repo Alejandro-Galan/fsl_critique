@@ -8,42 +8,51 @@
 ## LICENSE file in the root directory of this source tree
 ##+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-import torch
-import torch.nn as nn
 import unittest
 
+import torch
+import torch.nn as nn
+
+
 class DistanceNetwork(nn.Module):
+    """Compute support/query cosine-like similarities for Matching Networks.
+
+    The original implementation iterated over the support sequence. This
+    vectorized version preserves the same output and normalization behaviour:
+    it normalizes only support embeddings, not the query embeddings.
+    """
+
     def __init__(self):
-        super(DistanceNetwork, self).__init__()
+        super().__init__()
 
     def forward(self, support_set, input_image):
+        """Return similarities with shape ``[batch_size, sequence_length]``.
 
-        """
-        Produces pdfs over the support set classes for the target set image.
-        :param support_set: The embeddings of the support set images, tensor of shape [sequence_length, batch_size, 64]
-        :param input_image: The embedding of the target image, tensor of shape [batch_size, 64]
-        :return: Softmax pdf. Tensor with cosine similarities of shape [batch_size, sequence_length]
+        Args:
+            support_set: Tensor of shape ``[sequence_length, batch_size, embedding_dim]``.
+            input_image: Tensor of shape ``[batch_size, embedding_dim]``.
         """
         eps = 1e-10
-        similarities = []
-        for support_image in support_set:
-            sum_support = torch.sum(torch.pow(support_image, 2), 1)
-            support_magnitude = sum_support.clamp(eps, float("inf")).rsqrt()
-            dot_product = input_image.unsqueeze(1).bmm(support_image.unsqueeze(2)).squeeze()
-            cosine_similarity = dot_product * support_magnitude
-            similarities.append(cosine_similarity)
-        similarities = torch.stack(similarities)
-        return similarities.t()
+        if support_set.dim() != 3 or input_image.dim() != 2:
+            raise ValueError(
+                "Expected support_set [sequence_length, batch_size, embedding_dim] "
+                "and input_image [batch_size, embedding_dim]."
+            )
+        if support_set.size(1) != input_image.size(0) or support_set.size(2) != input_image.size(1):
+            raise ValueError("support_set and input_image dimensions are incompatible.")
+
+        dot_product = (support_set * input_image.unsqueeze(0)).sum(dim=2)
+        support_magnitude = support_set.pow(2).sum(dim=2).clamp(eps, float("inf")).rsqrt()
+        return (dot_product * support_magnitude).t()
+
 
 class DistanceNetworkTest(unittest.TestCase):
-    def setUp(self):
-        pass
+    def test_forward_shape(self):
+        support = torch.ones(3, 2, 4)
+        query = torch.ones(2, 4)
+        output = DistanceNetwork()(support, query)
+        self.assertEqual(tuple(output.shape), (2, 3))
 
-    def tearDown(self):
-        pass
-
-    def test_forward(self):
-        pass
 
 if __name__ == '__main__':
     unittest.main()
