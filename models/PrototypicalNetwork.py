@@ -33,16 +33,36 @@ class PrototypicalNetwork(nn.Module):
         return x.view(x.size(0), -1)
     
     @staticmethod
+    def _as_label_column(labels):
+        """Return labels with shape [batch, sequence, 1].
+
+        Prototypical loss expects integer class ids for both support and query
+        samples. Some callers provide support labels as one-hot tensors for the
+        MatchingNetwork path, so convert them back to class ids here before
+        concatenating with target labels.
+        """
+        if labels.dim() == 3 and labels.size(-1) > 1:
+            labels = labels.argmax(dim=-1)
+        elif labels.dim() == 3 and labels.size(-1) == 1:
+            return labels.long()
+        elif labels.dim() == 1:
+            labels = labels.unsqueeze(1)
+
+        if labels.dim() != 2:
+            raise ValueError(f"Expected labels with 1, 2 or 3 dims, got shape {tuple(labels.shape)}")
+
+        return labels.unsqueeze(2).long()
+
+    @staticmethod
     def get_outputs(x_target, y_target, x_support_set, y_support_set, encoder):
 
         if len(x_target.shape) < 5:
             x_target = x_target.unsqueeze(1)
-            y_target = y_target.unsqueeze(2)
         inputs_x = torch.cat((x_support_set, x_target), dim=1).cuda()
 
-        if len(y_target.shape) == 1:
-            y_target = y_target.unsqueeze(1)
-        inputs_y = torch.cat((y_support_set, y_target.unsqueeze(2)), dim=1).cuda()
+        support_labels = PrototypicalNetwork._as_label_column(y_support_set)
+        target_labels = PrototypicalNetwork._as_label_column(y_target)
+        inputs_y = torch.cat((support_labels, target_labels), dim=1).cuda()
 
         # For each item
         outputs_x = []

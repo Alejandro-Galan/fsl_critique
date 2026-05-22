@@ -9,14 +9,14 @@
     "SPC_OW": {
         "1":  [ 10 ],
         "3":  [ 1, 5 ],
-        "4":  [ 1, 5 ],
+        "4":  [ 1 ],
         "10": [ 10 ],
         "13": [ 10 ]
     },
     "MODEL_TS": {
         "1": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"],
         "3": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"],
-        "4": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"],
+        "4": ["PrototypicalNetwork"],
         "10": ["RelationNetwork"],
         "13": ["RelationNetwork", "MatchingNetwork", "PrototypicalNetwork"]
     },

@@ -33,6 +33,16 @@ full_name = str(sys.argv[3])
 Constants_c = Const_c(exp, full_name)
 Constants   = Constants_c.Constants
 
+PERFECT_ACC_EARLY_STOP_PATIENCE = 10
+PERFECT_ACC_EPSILON = 1e-12
+
+
+def _is_perfect_accuracy(acc) -> bool:
+    """Return True when an accuracy scalar has reached the maximum value, 1.0."""
+    if torch.is_tensor(acc):
+        acc = acc.detach().float().item()
+    return float(acc) >= 1.0 - PERFECT_ACC_EPSILON
+
 
 # ===========================================================================
 # Main class
@@ -56,6 +66,9 @@ class FewShotTrain:
         total_accuracy = 0.0
         best_epoch     = 0.0
         epochs_no_improve = 0
+        perfect_acc_streak = 0
+        if metrics is not None:
+            metrics["perfect_accuracy_early_stop"] = False
 
         new_path = checkpoint_path + "_trained_model.pt"
         os.makedirs(os.path.dirname(new_path), exist_ok=True)
@@ -78,11 +91,25 @@ class FewShotTrain:
                 total_c_loss   += c_loss.item()
                 total_accuracy += acc.item()
 
+                if _is_perfect_accuracy(acc):
+                    perfect_acc_streak += 1
+                else:
+                    perfect_acc_streak = 0
+
                 desc = f"tr_loss: {total_c_loss/(i+1):.4f}  acc: {acc.item():.4f}  mean: {total_accuracy/(i+1):.4f}"
                 if model_type != "RelationNetwork":
                     desc += f"  lr: {optimizer.param_groups[0]['lr']:.6f}"
                 pbar.set_description(desc)
                 pbar.update(1)
+
+                if perfect_acc_streak >= PERFECT_ACC_EARLY_STOP_PATIENCE:
+                    if metrics is not None:
+                        metrics["perfect_accuracy_early_stop"] = True
+                    print(
+                        "Early stopping triggered: "
+                        f"training accuracy reached 1.0 for {perfect_acc_streak} consecutive batches"
+                    )
+                    break
 
                 # ---- source validation ----
                 if Constants["VALIDATION_SRC_SRC_DATA"] and (i + 1) % limit_val_src == 0:
@@ -193,6 +220,9 @@ class FewShotTrain:
         total_accuracy    = 0.0
         best_epoch        = 0.0
         epochs_no_improve = 0
+        perfect_acc_streak = 0
+        if metrics is not None:
+            metrics["perfect_accuracy_early_stop"] = False
         total_batches     = Constants["FINE_TUNING_EPISODES"] // batch_size
 
         encoder.train()
@@ -209,11 +239,60 @@ class FewShotTrain:
 
                 total_c_loss   += c_loss.item()
                 total_accuracy += acc.item()
+
+                if _is_perfect_accuracy(acc):
+                    perfect_acc_streak += 1
+                else:
+                    perfect_acc_streak = 0
+
                 pbar.set_description(
                     f"ft_loss: {total_c_loss/(i+1):.4f}  acc: {acc.item():.4f}"
                     f"  lr: {optimizer.param_groups[0]['lr']:.6f}"
                 )
                 pbar.update(1)
+
+                if perfect_acc_streak >= PERFECT_ACC_EARLY_STOP_PATIENCE:
+                    if metrics is not None:
+                        metrics["perfect_accuracy_early_stop"] = True
+                    print(
+                        "Early stopping triggered: "
+                        f"fine-tuning accuracy reached 1.0 for {perfect_acc_streak} consecutive batches"
+                    )
+
+                    # Do not leave this bootstrap with best_accuracy == 0.0 just
+                    # because we stopped before the normal end-of-epoch
+                    # evaluation point. Training/fine-tuning accuracy is not the
+                    # reported metric; evaluate on the target test episodes before
+                    # breaking and persist the model if it improves.
+                    encoder.eval()
+                    test_accs_std, _, _, dists = FewShotTrain.eval_few_shot_net(
+                        batch_size=batch_size, encoder=encoder,
+                        X=X_eval, Y=Y_eval, X_train=X, Y_train=Y,
+                        device=device, model_type=model_type, supp_set=None,
+                        classes_per_set=classes_per_set,
+                        samples_per_class=samples_per_class,
+                        metrics=metrics, finetune=True,
+                    )
+                    test_accs = test_accs_std[0]
+                    if metrics is not None:
+                        metrics["ft_acc"] = float(acc.item())
+                        metrics["ft_eval_acc"] = float(test_accs)
+
+                    if test_accs > metrics["best_accuracy"]:
+                        metrics["best_accuracy"] = test_accs
+                        best_epoch = i
+                        os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+                        try:
+                            save_path = Const_c.get_id_extensions(Constants, prev_str=checkpoint_path)
+                            FewShotTrain.store_encoder(encoder, optimizer, save_path, model_type)
+                        except Exception:
+                            coded = Const_c.add_to_dictionary_of_files(
+                                Const_c.get_id_extensions(Constants, prev_str=checkpoint_path)
+                            ) + ".pt"
+                            FewShotTrain.store_encoder(encoder, optimizer, coded, model_type)
+
+                    encoder.train()
+                    break
 
                 end_of_epoch         = (i + 1) % total_batches == 0
                 is_exp3_loss_case    = (
@@ -234,6 +313,9 @@ class FewShotTrain:
                         metrics=metrics, finetune=True,
                     )
                     test_accs = test_accs_std[0]
+                    if metrics is not None:
+                        metrics["ft_acc"] = float(acc.item())
+                        metrics["ft_eval_acc"] = float(test_accs)
 
                     if is_exp3_loss_case:
                         path_dists = Const_c.get_distances_path(

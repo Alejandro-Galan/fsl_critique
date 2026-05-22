@@ -375,8 +375,15 @@ def check_banned_cases(df):
         print("Banned case: ", df["tgt_dataset"].unique()[0], "as target dataset")
         return True
     
+    if "exp_name" not in df.columns:
+        print("Banned case: exp_name not in df columns")
+        return True
+
     all_ds = df["exp_name"].unique()
     all_ds = [c for c in all_ds if not pd.isna(c)]
+    if not all_ds:
+        print("Banned case: empty exp_name column")
+        return True
     if "1" in all_ds[0]:
         if "NO_SRC_DATASET" in df["src_datasets"].unique()[0]:
             print("Banned case: ", df["src_datasets"].unique()[0], "as source dataset in exp1")
@@ -480,11 +487,12 @@ for root, folders, files in os.walk(logs_base_path):
                 
 
 
-
+            output_dir = "logs_csv/reduced_logs_csv"
+            os.makedirs(output_dir, exist_ok=True)
             ## Save the data
             for exp_name, df in exp_tables.items():
                 print("######################### STARTING EXP", exp_name, "from", folder_path)
-                df.to_csv('logs_csv/reduced_logs_csv/' + exp_name + '.csv', index=False)
+                df.to_csv(output_dir + '/' + exp_name + '.csv', index=False)
 
 
                 check_complete_executions(exp_name, df, exhaustive=True)

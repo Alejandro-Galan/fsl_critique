@@ -119,7 +119,7 @@ def run_bootstrap(
         _print_split_summary(YTrain, YTest, Y_val)
         _validate_nway_config(YTrain, YTest)
 
-        _, train_best_acc = train_and_test_model(
+        _, train_best_acc, metrics = train_and_test_model(
             XTrain=XTrain, YTrain=YTrain,
             XTest=XTest,   YTest=YTest,
             XSupp=XSupp,   YSupp=YSupp,
@@ -147,6 +147,7 @@ def run_bootstrap(
             src_input_size=src_input_size,
             samples_per_class=samples_per_class,
             model_type=model_type,
+            metrics=metrics,
         )
         accumulated_history = pd.concat([accumulated_history, pd.DataFrame([run_history])], ignore_index=True)
         _save_history(accumulated_history, path_logs)
@@ -215,7 +216,9 @@ def train_and_test_model(
         )
         print(f"AFTER FINETUNING best_accuracy: {metrics['best_accuracy']:.4f}")
 
-    return None, metrics["best_accuracy"]
+    metrics["ft_eval_acc"] = float(metrics.get("ft_eval_acc", metrics["best_accuracy"]))
+    metrics["ft_acc"] = float(metrics.get("ft_acc", metrics["best_accuracy"]))
+    return None, metrics["best_accuracy"], metrics
 
 
 # ---------------------------------------------------------------------------
@@ -394,10 +397,20 @@ def _validate_nway_config(YTrain, YTest):
 
 
 
-def _build_run_history_row(run, accuracy, ds_name, src_datasets, src_input_size, samples_per_class, model_type) -> dict:
+def _build_run_history_row(run, accuracy, ds_name, src_datasets, src_input_size, samples_per_class, model_type, metrics=None) -> dict:
+    metrics = metrics or {}
+    ft_eval_acc = float(metrics.get("ft_eval_acc", metrics.get("best_accuracy", accuracy / 100.0)))
+    ft_acc = float(metrics.get("ft_acc", ft_eval_acc))
+    before_ft_eval_acc = float(metrics.get("before_ft_eval_acc", 0.0))
+    before_ft_eval_loss = metrics.get("before_ft_eval_loss", "")
+
     return {
         "bootstrap_iter": run,
         "accuracy": accuracy,
+        "ft_acc": ft_acc,
+        "ft_eval_acc": ft_eval_acc,
+        "before_ft_eval_acc": before_ft_eval_acc,
+        "before_ft_eval_loss": before_ft_eval_loss,
         "tgt_dataset": ds_name,
         "src_datasets": "__".join(src_datasets) if isinstance(src_datasets, (list, tuple)) else str(src_datasets),
         "samples_per_class": samples_per_class,
@@ -510,13 +523,17 @@ def _pretrain(model, optimizer, scheduler, XTrain, YTrain, XTest, YTest, X_val, 
         )
         if train_best_acc > metrics["best_accuracy"]:
             metrics["best_accuracy"] = train_best_acc
+        if metrics.get("perfect_accuracy_early_stop"):
+            break
 
 
 def _finetune(model, XSupp, YSupp, XTest, YTest, batch_size, num_c_ts, samples_per_class,
               model_type, path_weights_base, path_weights_pretrained,
               metrics, reuse_logs, boots_iter, device):
     print("\nFineTune!!")
-    best_before = metrics["best_accuracy"]
+    best_before = float(metrics["best_accuracy"])
+    metrics["before_ft_eval_acc"] = best_before
+    metrics["before_ft_eval_loss"] = ""
     metrics["best_accuracy"] = 0.0
 
     optimizer = torch.optim.Adam(model.parameters(), lr=Constants["lrFineTuning"], weight_decay=1e-6)
@@ -540,7 +557,11 @@ def _finetune(model, XSupp, YSupp, XTest, YTest, batch_size, num_c_ts, samples_p
             metrics=metrics, ft_epoch_num=epoch,
             reuse_logs=reuse_logs, boots_iter=boots_iter,
         )
+        if metrics.get("perfect_accuracy_early_stop"):
+            break
 
+    metrics["ft_acc"] = float(metrics.get("ft_acc", metrics["best_accuracy"]))
+    metrics["ft_eval_acc"] = float(metrics.get("ft_eval_acc", metrics["best_accuracy"]))
     print(f"BEST before FT: {best_before:.4f}  →  after FT: {metrics['best_accuracy']:.4f}")
 
 

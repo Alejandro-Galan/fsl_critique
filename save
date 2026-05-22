@@ -1,0 +1,180 @@
+-------- SUPERVISED RelationNetwork CLASSIFICATION EXPERIMENT --------
+src_Datasets: ['omniglot_SOTA_trainSet']
+tgt_Dataset:  ['b-59-850']
+Samples/class: 10  |  Min occurence: 50
+Epochs: 1  |  Batch size: 16  |  Runs: 5
+NWAY TRAIN: 5  |  NWAY TEST: 5
+------------------------------------------------------------------
+Path logs does not exist logs_csv/last_exec_exp1/exp1_permuted_src_datasets-src_ds_omniglot_SOTA_trainSet_tgt_ds-b-59-850-spc_10-model-RelationNetwork-5-nwayTrain_.csv
+Base weights: WEIGHTS/RelationNetwork-4000_E-40x40_I_S/False_FSS-omniglot_SOTA_trainSet-5_NWAY_TRAIN-16_Batch_Size-10_KSpC-0.001_lr-0.0_ValSrc-
+omniglot_SOTA_trainSet
+Removing labels that appear less than 50 times
+Before: 17112 samples, After: 16709 samples
+b-59-850
+Bootstrap run 1/5
+
+REDUCED Train: 4800 from 4800
+
+REDUCED Test: 6 from 6
+	Total (train+test, val): 97560, 0
+	Test: 1560  |  Val: 0
+	Source classes [Train+Val]: 4800 (4800, 0)
+	Target classes: 6
+	N-WAY Train: 5  |  N-WAY Test: 5
+USING DEVICE: cuda
+
+FineTune!!
+
+  0%|          | 0/62 [00:00<?, ?it/s]
+ft_loss: 0.0205  acc: 0.9625  lr: 0.000100:   0%|          | 0/62 [00:00<?, ?it/s]
+ft_loss: 0.0205  acc: 0.9625  lr: 0.000100:   2%|▏         | 1/62 [00:00<00:26,  2.30it/s]
+ft_loss: 0.0144  acc: 1.0000  lr: 0.000100:   2%|▏         | 1/62 [00:00<00:26,  2.30it/s]
+ft_loss: 0.0144  acc: 1.0000  lr: 0.000100:   3%|▎         | 2/62 [00:00<00:14,  4.07it/s]
+ft_loss: 0.0101  acc: 1.0000  lr: 0.000100:   3%|▎         | 2/62 [00:00<00:14,  4.07it/s]
+ft_loss: 0.0101  acc: 1.0000  lr: 0.000100:   5%|▍         | 3/62 [00:00<00:10,  5.39it/s]
+ft_loss: 0.0080  acc: 1.0000  lr: 0.000100:   5%|▍         | 3/62 [00:00<00:10,  5.39it/s]
+ft_loss: 0.0080  acc: 1.0000  lr: 0.000100:   6%|▋         | 4/62 [00:00<00:09,  6.11it/s]
+ft_loss: 0.0065  acc: 1.0000  lr: 0.000100:   6%|▋         | 4/62 [00:00<00:09,  6.11it/s]
+ft_loss: 0.0054  acc: 1.0000  lr: 0.000100:   8%|▊         | 5/62 [00:01<00:09,  6.11it/s]
+ft_loss: 0.0054  acc: 1.0000  lr: 0.000100:  10%|▉         | 6/62 [00:01<00:07,  7.52it/s]
+ft_loss: 0.0047  acc: 1.0000  lr: 0.000100:  10%|▉         | 6/62 [00:01<00:07,  7.52it/s]
+ft_loss: 0.0047  acc: 1.0000  lr: 0.000100:  11%|█▏        | 7/62 [00:01<00:07,  7.80it/s]
+ft_loss: 0.0041  acc: 1.0000  lr: 0.000100:  11%|█▏        | 7/62 [00:01<00:07,  7.80it/s]
+ft_loss: 0.0041  acc: 1.0000  lr: 0.000100:  13%|█▎        | 8/62 [00:01<00:06,  8.26it/s]
+ft_loss: 0.0037  acc: 1.0000  lr: 0.000100:  13%|█▎        | 8/62 [00:01<00:06,  8.26it/s]
+ft_loss: 0.0037  acc: 1.0000  lr: 0.000100:  15%|█▍        | 9/62 [00:01<00:06,  8.63it/s]
+ft_loss: 0.0033  acc: 1.0000  lr: 0.000100:  15%|█▍        | 9/62 [00:01<00:06,  8.63it/s]
+ft_loss: 0.0033  acc: 1.0000  lr: 0.000100:  16%|█▌        | 10/62 [00:01<00:06,  8.34it/s]
+ft_loss: 0.0030  acc: 1.0000  lr: 0.000100:  16%|█▌        | 10/62 [00:01<00:06,  8.34it/s]
+ft_loss: 0.0030  acc: 1.0000  lr: 0.000100:  18%|█▊        | 11/62 [00:01<00:06,  8.03it/s]Early stopping triggered: fine-tuning accuracy reached 1.0 for 10 consecutive batches
+
+
+  0%|          | 0/250 [00:00<?, ?it/s]␛[A
+
+Finetune: Test Acc 0.9125:   0%|          | 0/250 [00:00<?, ?it/s]␛[A
+
+Finetune: Test Acc 0.9250:   2%|▏         | 5/250 [00:00<00:04, 59.50it/s]␛[A
+
+Finetune: Test Acc 0.9125:   4%|▍         | 10/250 [00:00<00:02, 82.10it/s]␛[A
+
+Finetune: Test Acc 0.9125:   6%|▌         | 15/250 [00:00<00:01, 123.09it/s]␛[A
+
+Finetune: Test Acc 0.9156:   6%|▌         | 15/250 [00:00<00:01, 123.09it/s]␛[A
+
+Finetune: Test Acc 0.9175:   8%|▊         | 20/250 [00:00<00:01, 123.09it/s]␛[A
+
+Finetune: Test Acc 0.9167:  10%|█         | 25/250 [00:00<00:01, 123.09it/s]␛[A
+
+Finetune: Test Acc 0.9167:  12%|█▏        | 30/250 [00:00<00:01, 128.11it/s]␛[A
+
+Finetune: Test Acc 0.9196:  12%|█▏        | 30/250 [00:00<00:01, 128.11it/s]␛[A
+
+Finetune: Test Acc 0.9203:  14%|█▍        | 35/250 [00:00<00:01, 128.11it/s]␛[A
+
+Finetune: Test Acc 0.9181:  16%|█▌        | 40/250 [00:00<00:01, 128.11it/s]␛[A
+
+Finetune: Test Acc 0.9181:  18%|█▊        | 45/250 [00:00<00:01, 129.73it/s]␛[A
+
+Finetune: Test Acc 0.9163:  18%|█▊        | 45/250 [00:00<00:01, 129.73it/s]␛[A
+
+Finetune: Test Acc 0.9182:  20%|██        | 50/250 [00:00<00:01, 129.73it/s]␛[A
+
+Finetune: Test Acc 0.9188:  22%|██▏       | 55/250 [00:00<00:01, 129.73it/s]␛[A
+
+Finetune: Test Acc 0.9188:  24%|██▍       | 60/250 [00:00<00:01, 130.37it/s]␛[A
+
+Finetune: Test Acc 0.9202:  24%|██▍       | 60/250 [00:00<00:01, 130.37it/s]␛[A
+
+Finetune: Test Acc 0.9214:  26%|██▌       | 65/250 [00:00<00:01, 130.37it/s]␛[A
+
+Finetune: Test Acc 0.9208:  28%|██▊       | 70/250 [00:00<00:01, 130.37it/s]␛[A
+
+Finetune: Test Acc 0.9208:  30%|███       | 75/250 [00:00<00:01, 130.52it/s]␛[A
+
+Finetune: Test Acc 0.9227:  30%|███       | 75/250 [00:00<00:01, 130.52it/s]␛[A
+
+Finetune: Test Acc 0.9343:  32%|███▏      | 80/250 [00:03<00:01, 130.52it/s]␛[A
+
+Finetune: Test Acc 0.9345:  34%|███▍      | 85/250 [00:03<00:01, 130.52it/s]␛[A
+
+Finetune: Test Acc 0.9345:  36%|███▌      | 90/250 [00:03<00:10, 15.96it/s] ␛[A
+
+Finetune: Test Acc 0.9348:  36%|███▌      | 90/250 [00:03<00:10, 15.96it/s]␛[A
+
+Finetune: Test Acc 0.9353:  38%|███▊      | 95/250 [00:03<00:09, 15.96it/s]␛[A
+
+Finetune: Test Acc 0.9351:  40%|████      | 100/250 [00:03<00:09, 15.96it/s]␛[A
+
+Finetune: Test Acc 0.9351:  42%|████▏     | 105/250 [00:03<00:06, 22.39it/s]␛[A
+
+Finetune: Test Acc 0.9356:  42%|████▏     | 105/250 [00:03<00:06, 22.39it/s]␛[A
+
+Finetune: Test Acc 0.9358:  44%|████▍     | 110/250 [00:03<00:06, 22.39it/s]␛[A
+
+Finetune: Test Acc 0.9358:  46%|████▌     | 115/250 [00:03<00:06, 22.39it/s]␛[A
+
+Finetune: Test Acc 0.9358:  48%|████▊     | 120/250 [00:03<00:04, 30.43it/s]␛[A
+
+Finetune: Test Acc 0.9358:  48%|████▊     | 120/250 [00:03<00:04, 30.43it/s]␛[A
+
+Finetune: Test Acc 0.9357:  50%|█████     | 125/250 [00:03<00:04, 30.43it/s]␛[A
+
+Finetune: Test Acc 0.9354:  52%|█████▏    | 130/250 [00:03<00:03, 30.43it/s]␛[A
+
+Finetune: Test Acc 0.9354:  54%|█████▍    | 135/250 [00:03<00:02, 40.05it/s]␛[A
+
+Finetune: Test Acc 0.9353:  54%|█████▍    | 135/250 [00:03<00:02, 40.05it/s]␛[A
+
+Finetune: Test Acc 0.9348:  56%|█████▌    | 140/250 [00:03<00:02, 40.05it/s]␛[A
+
+Finetune: Test Acc 0.9346:  58%|█████▊    | 145/250 [00:03<00:02, 40.05it/s]␛[A
+
+Finetune: Test Acc 0.9346:  60%|██████    | 150/250 [00:03<00:01, 50.98it/s]␛[A
+
+Finetune: Test Acc 0.9346:  60%|██████    | 150/250 [00:03<00:01, 50.98it/s]␛[A
+
+Finetune: Test Acc 0.9348:  62%|██████▏   | 155/250 [00:03<00:01, 50.98it/s]␛[A
+
+Finetune: Test Acc 0.9349:  64%|██████▍   | 160/250 [00:06<00:01, 50.98it/s]␛[A
+
+Finetune: Test Acc 0.9349:  66%|██████▌   | 165/250 [00:06<00:05, 15.22it/s]␛[A
+
+Finetune: Test Acc 0.9350:  66%|██████▌   | 165/250 [00:06<00:05, 15.22it/s]␛[A
+
+Finetune: Test Acc 0.9354:  68%|██████▊   | 170/250 [00:06<00:05, 15.22it/s]␛[A
+
+Finetune: Test Acc 0.9354:  70%|███████   | 175/250 [00:06<00:04, 15.22it/s]␛[A
+
+Finetune: Test Acc 0.9354:  72%|███████▏  | 180/250 [00:06<00:03, 20.81it/s]␛[A
+
+Finetune: Test Acc 0.9354:  72%|███████▏  | 180/250 [00:06<00:03, 20.81it/s]␛[A
+
+Finetune: Test Acc 0.9352:  74%|███████▍  | 185/250 [00:06<00:03, 20.81it/s]␛[A
+
+Finetune: Test Acc 0.9353:  76%|███████▌  | 190/250 [00:06<00:02, 20.81it/s]␛[A
+
+Finetune: Test Acc 0.9353:  78%|███████▊  | 195/250 [00:06<00:01, 27.92it/s]␛[A
+
+Finetune: Test Acc 0.9355:  78%|███████▊  | 195/250 [00:06<00:01, 27.92it/s]␛[A
+
+Finetune: Test Acc 0.9356:  80%|████████  | 200/250 [00:06<00:01, 27.92it/s]␛[A
+
+Finetune: Test Acc 0.9357:  82%|████████▏ | 205/250 [00:06<00:01, 27.92it/s]␛[A
+
+Finetune: Test Acc 0.9357:  84%|████████▍ | 210/250 [00:06<00:01, 36.61it/s]␛[A
+
+Finetune: Test Acc 0.9356:  84%|████████▍ | 210/250 [00:06<00:01, 36.61it/s]␛[A
+
+Finetune: Test Acc 0.9358:  86%|████████▌ | 215/250 [00:06<00:00, 36.61it/s]␛[A
+
+Finetune: Test Acc 0.9358:  88%|████████▊ | 220/250 [00:06<00:00, 36.61it/s]␛[A
+
+Finetune: Test Acc 0.9358:  90%|█████████ | 225/250 [00:06<00:00, 46.75it/s]␛[A
+
+Finetune: Test Acc 0.9361:  90%|█████████ | 225/250 [00:06<00:00, 46.75it/s]␛[A
+
+Finetune: Test Acc 0.9359:  92%|█████████▏| 230/250 [00:06<00:00, 46.75it/s]␛[A
+
+Finetune: Test Acc 0.9359:  94%|█████████▍| 235/250 [00:06<00:00, 46.75it/s]␛[A
+
+Finetune: Test Acc 0.9359:  96%|█████████▌| 240/250 [00:06<00:00, 57.89it/s]␛[A
